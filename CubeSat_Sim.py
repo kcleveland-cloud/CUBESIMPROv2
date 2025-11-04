@@ -72,7 +72,6 @@ class CubeSatSim:
     def simulate_orbit_3d(self, num_points=200):
         theta = np.linspace(0, 2 * np.pi, num_points)
         radius = 6371 + self.altitude_km
-        # Inclined orbit: rotate around X-axis
         inc = self.inclination
         x = radius * np.cos(theta)
         y = radius * np.sin(theta) * np.cos(inc)
@@ -85,10 +84,18 @@ class CubeSatSim:
         alt = np.full_like(times, self.altitude_m) + 100 * np.sin(thetas)
         return times / 3600, alt / 1000
 
+    def ground_track(self, num_points=200):
+        theta = np.linspace(0, 2 * np.pi, num_points)
+        # Longitude = theta (in radians) → degrees
+        lon = np.degrees(theta)
+        # Latitude from inclination
+        lat = np.degrees(np.arcsin(np.sin(theta) * np.sin(self.inclination)))
+        return lon, lat
+
 # --- Streamlit App ---
 st.set_page_config(page_title="CubeSat Simulator", layout="wide")
 st.title("NASA-Accurate CubeSat Simulator")
-st.markdown("**GeneSat-1 Validated • 1U CubeSat • Inclined 3D Orbit Animation**")
+st.markdown("**GeneSat-1 Validated • 1U CubeSat • Ground Track + 3D Orbit**")
 
 # Sidebar
 with st.sidebar:
@@ -100,96 +107,111 @@ with st.sidebar:
 
 sim = CubeSatSim(altitude, inclination)
 
-tab1, tab2, tab3 = st.tabs(["3D Orbit", "Power", "Thermal"])
+tab1, tab2, tab3 = st.tabs(["3D + Ground Track", "Power", "Thermal"])
 
-# === TAB 1: ANIMATED INCLINED ORBIT ===
+# === TAB 1: 3D ORBIT + GROUND TRACK ===
 with tab1:
-    st.subheader("Live 3D Inclined Orbit Animation")
+    col3d, colmap = st.columns([1, 1])
 
-    # Generate orbit points with inclination
-    x_orbit, y_orbit, z_orbit = sim.simulate_orbit_3d()
+    with col3d:
+        st.subheader("3D Orbital Animation")
 
-    # Frames for animation
-    frames = []
-    for i in range(0, len(x_orbit), 2):
-        frame = go.Frame(
+        # 3D Plot
+        x_orbit, y_orbit, z_orbit = sim.simulate_orbit_3d()
+        frames_3d = []
+        for i in range(0, len(x_orbit), 2):
+            frame = go.Frame(
+                data=[
+                    go.Scatter3d(x=x_orbit[:i], y=y_orbit[:i], z=z_orbit[:i],
+                                 mode='lines', line=dict(color='yellow', width=4), name='Trail'),
+                    go.Scatter3d(x=[x_orbit[i]], y=[y_orbit[i]], z=[z_orbit[i]],
+                                 mode='markers', marker=dict(size=12, color='yellow', symbol='diamond'), name='CubeSat')
+                ],
+                name=str(i)
+            )
+            frames_3d.append(frame)
+
+        fig3d = go.Figure(
             data=[
-                go.Scatter3d(x=x_orbit[:i], y=y_orbit[:i], z=z_orbit[:i],
-                             mode='lines', line=dict(color='yellow', width=4), name='Trail'),
-                go.Scatter3d(x=[x_orbit[i]], y=[y_orbit[i]], z=[z_orbit[i]],
+                go.Scatter3d(x=[], y=[], z=[], mode='lines', line=dict(color='lightblue', width=2), name='Earth'),
+                go.Scatter3d(x=x_orbit, y=y_orbit, z=z_orbit, mode='lines', line=dict(color='red', width=6), name='Orbit'),
+                go.Scatter3d(x=[], y=[], z=[], mode='lines', line=dict(color='yellow', width=4), name='Trail'),
+                go.Scatter3d(x=[x_orbit[0]], y=[y_orbit[0]], z=[z_orbit[0]],
                              mode='markers', marker=dict(size=12, color='yellow', symbol='diamond'), name='CubeSat')
             ],
-            name=str(i)
+            layout=go.Layout(
+                updatemenus=[dict(
+                    type="buttons",
+                    buttons=[
+                        dict(label="Play", method="animate", args=[None, dict(frame=dict(duration=50/anim_speed, redraw=True), fromcurrent=True)]),
+                        dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])
+                    ],
+                    y=1.1
+                )],
+                scene=dict(
+                    xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                    yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                    zaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                    aspectmode='cube',
+                    camera=dict(eye=dict(x=1.8, y=1.8, z=1.2))
+                ),
+                height=500,
+                margin=dict(l=0, r=0, b=0, t=40)
+            ),
+            frames=frames_3d
         )
-        frames.append(frame)
 
-    # Initial frame
-    fig = go.Figure(
-        data=[
-            # Earth wireframe
-            go.Scatter3d(
-                x=[], y=[], z=[],
-                mode='lines',
-                line=dict(color='lightblue', width=2),
-                name='Earth'
-            ),
-            # Full orbit (static)
-            go.Scatter3d(
-                x=x_orbit, y=y_orbit, z=z_orbit,
-                mode='lines',
-                line=dict(color='red', width=6),
-                name='Orbit'
-            ),
-            # Initial trail and CubeSat
-            go.Scatter3d(x=[], y=[], z=[], mode='lines', line=dict(color='yellow', width=4), name='Trail'),
-            go.Scatter3d(x=[x_orbit[0]], y=[y_orbit[0]], z=[z_orbit[0]],
-                         mode='markers', marker=dict(size=12, color='yellow', symbol='diamond'), name='CubeSat')
-        ],
-        layout=go.Layout(
-            updatemenus=[dict(
-                type="buttons",
-                buttons=[
-                    dict(label="Play", method="animate", args=[None, dict(frame=dict(duration=50/anim_speed, redraw=True), fromcurrent=True, mode='immediate')]),
-                    dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])
+        # Add Earth wireframe
+        earth_radius = 6371
+        u = np.linspace(0, 2 * np.pi, 20)
+        v = np.linspace(0, np.pi, 10)
+        x_earth = earth_radius * np.outer(np.cos(u), np.sin(v)).flatten()
+        y_earth = earth_radius * np.outer(np.sin(u), np.sin(v)).flatten()
+        z_earth = earth_radius * np.outer(np.ones(np.size(u)), np.cos(v)).flatten()
+        fig3d.add_trace(go.Scatter3d(x=x_earth, y=y_earth, z=z_earth, mode='lines', line=dict(color='lightblue', width=2), name='Earth'))
+
+        st.plotly_chart(fig3d, use_container_width=True)
+
+    with colmap:
+        st.subheader("Ground Track")
+
+        lon, lat = sim.ground_track()
+
+        # Frames for ground track animation
+        frames_map = []
+        for i in range(0, len(lon), 2):
+            frame = go.Frame(
+                data=[
+                    go.Scattergeo(lon=lon[:i], lat=lat[:i], mode='lines', line=dict(color='yellow', width=4), name='Track'),
+                    go.Scattergeo(lon=[lon[i]], lat=[lat[i]], mode='markers', marker=dict(size=12, color='yellow'), name='CubeSat')
                 ],
-                y=1.1
-            )],
-            scene=dict(
-                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                zaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                aspectmode='cube',
-                camera=dict(eye=dict(x=1.8, y=1.8, z=1.2))
+                name=str(i)
+            )
+            frames_map.append(frame)
+
+        fig_map = go.Figure(
+            data=[
+                go.Scattergeo(lon=lon, lat=lat, mode='lines', line=dict(color='red', width=4), name='Orbit'),
+                go.Scattergeo(lon=[], lat=[], mode='lines', line=dict(color='yellow', width=4), name='Track'),
+                go.Scattergeo(lon=[lon[0]], lat=[lat[0]], mode='markers', marker=dict(size=12, color='yellow'), name='CubeSat')
+            ],
+            layout=go.Layout(
+                geo=dict(
+                    projection_type='orthographic',
+                    showland=True, landcolor='lightgreen',
+                    showocean=True, oceancolor='lightblue',
+                    showcountries=True, countrycolor='gray',
+                    lataxis=dict(range=[-90, 90]), lonaxis=dict(range=[-180, 180])
+                ),
+                height=500,
+                margin=dict(l=0, r=0, b=0, t=0)
             ),
-            height=650,
-            margin=dict(l=0, r=0, b=0, t=40)
-        ),
-        frames=frames
-    )
+            frames=frames_map
+        )
 
-    # Add Earth wireframe
-    earth_radius = 6371
-    u = np.linspace(0, 2 * np.pi, 20)
-    v = np.linspace(0, np.pi, 10)
-    x_earth = earth_radius * np.outer(np.cos(u), np.sin(v)).flatten()
-    y_earth = earth_radius * np.outer(np.sin(u), np.sin(v)).flatten()
-    z_earth = earth_radius * np.outer(np.ones(np.size(u)), np.cos(v)).flatten()
+        st.plotly_chart(fig_map, use_container_width=True)
 
-    fig.add_trace(go.Scatter3d(
-        x=x_earth, y=y_earth, z=z_earth,
-        mode='lines',
-        line=dict(color='lightblue', width=2),
-        name='Earth'
-    ))
-
-    st.plotly_chart(fig, use_container_width=True)
-
-    # 2D Plot
-    time_h, alt_km = sim.simulate_orbit()
-    fig2d = px.line(x=time_h, y=alt_km, labels={'x': 'Time (hours)', 'y': 'Altitude (km)'}, title="Altitude Variation")
-    st.plotly_chart(fig2d, use_container_width=True)
-
-# === TAB 2: POWER ===
+# === TAB 2 & 3 ===
 with tab2:
     st.subheader("Power Budget")
     avg_p, cons = sim.power_budget()
@@ -199,7 +221,6 @@ with tab2:
     col2.metric("Consumed", f"{cons:.2f} W")
     col3.metric("Net", f"{net:+.2f} W", delta=f"{net:+.2f} W")
 
-# === TAB 3: THERMAL ===
 with tab3:
     st.subheader("Thermal Analysis")
     thermal = sim.thermal_model()
@@ -212,7 +233,6 @@ with tab3:
     st.write(f"**Daily Dose:** {dose:.2f} rads/day")
     st.write(f"**{mission_days}-Day Total:** {dose*mission_days:.1f} rads")
 
-# === BENCHMARK ===
 if st.button("Benchmark: 400 km Run"):
     bench = CubeSatSim(400)
     t = bench.thermal_model()
