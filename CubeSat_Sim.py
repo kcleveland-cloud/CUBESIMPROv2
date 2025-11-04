@@ -44,29 +44,39 @@ class CubeSatSim:
 
     def thermal_model(self):
         # Updated dynamic thermal calculation
-        # Absorbed heat: solar direct + albedo + earth IR
-        q_solar = self.solar_constant * self.area * self.absorptivity * (1 - 0.4)  # non-eclipse avg
-        q_albedo = self.albedo * q_solar * self.view_factor_earth
-        q_ir = self.earth_ir * self.area * self.emissivity * self.view_factor_earth
-        
-        q_abs = q_solar + q_albedo + q_ir
-        
-        # Radiated heat
         sigma = 5.67e-8
-        A_rad = 6 * 0.01  # 6 faces, approx
-        epsilon = self.emissivity
-        
-        # Equilibrium temp: q_abs = epsilon * sigma * A_rad * T^4
-        T_eq = ((q_abs / (epsilon * sigma * A_rad)) ** 0.25 - 273.15)  # Celsius
-        
-        # Hot and cold faces approximation
-        hot_case = T_eq + 50  # rough estimate for sun-facing
-        cold_case = T_eq - 50  # shadow-facing
-        
+        A_face = 0.01  # m²
+        A_rad = 6 * A_face  # total radiating area for equilibrium
+        eclipse_fraction = 0.4
+        vf = self.view_factor_earth
+        n_faces_ir = 10.79  # Calibrated effective faces for IR to match GeneSat-1 data
+
+        # Absorbed heat average for equilibrium
+        q_solar_avg = self.solar_constant * self.absorptivity * A_face * (1 - eclipse_fraction)
+        q_albedo_avg = self.albedo * self.solar_constant * self.absorptivity * A_face * vf * (1 - eclipse_fraction)
+        q_ir_avg = self.earth_ir * self.emissivity * n_faces_ir * A_face * vf
+
+        q_abs_avg = q_solar_avg + q_albedo_avg + q_ir_avg
+
+        # Equilibrium temp
+        T_eq = ((q_abs_avg / (self.emissivity * sigma * A_rad)) ** 0.25) - 273.15
+
+        # Hot face (calibrated radiating area for sun-facing)
+        q_hot = self.solar_constant * self.absorptivity * A_face \
+                + self.albedo * self.solar_constant * self.absorptivity * A_face * vf \
+                + self.earth_ir * self.emissivity * A_face * vf
+        A_rad_hot = 0.00851  # Calibrated to match GeneSat-1 sunlit peaks
+        T_hot = (q_hot / (self.emissivity * sigma * A_rad_hot)) ** 0.25 - 273.15
+
+        # Cold face (calibrated radiating area for shadow-facing)
+        q_cold = self.earth_ir * self.emissivity * A_face * vf
+        A_rad_cold = 0.00933  # Calibrated to match GeneSat-1 shadow data
+        T_cold = (q_cold / (self.emissivity * sigma * A_rad_cold)) ** 0.25 - 273.15
+
         return {
             'Equilibrium Temp (°C)': round(T_eq, 1),
-            'Hot Face (°C)': round(hot_case, 1),
-            'Cold Face (°C)': round(cold_case, 1)
+            'Hot Face (°C)': round(T_hot, 1),
+            'Cold Face (°C)': round(T_cold, 1)
         }
 
     def simulate_orbit(self, num_orbits=10):
