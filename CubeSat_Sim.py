@@ -35,14 +35,4 @@ class CubeSatSim:
         solar_power = self.solar_constant * self.area * self.absorptivity * (1 - eclipse_fraction)
         avg_power = solar_power * 0.9
         consumption = 2.0
-        return avg_power, consumption
-
-    def thermal_model(self):
-        sigma = 5.67e-8
-        A_face = 0.01
-        A_rad = 6 * A_face
-        eclipse_fraction = 0.4
-        vf = self.view_factor_earth
-        n_faces_ir = 10.79
-
-        q_solar_avg
+        return avg_power,
