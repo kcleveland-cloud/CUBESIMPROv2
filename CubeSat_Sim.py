@@ -47,9 +47,4 @@ class CubeSatSim:
 
         q_solar_avg = self.solar_constant * self.absorptivity * A_face * (1 - eclipse_fraction)
         q_albedo_avg = self.albedo * self.solar_constant * self.absorptivity * A_face * vf * (1 - eclipse_fraction)
-        q_ir_avg = self.earth_ir * self.emissivity * n_faces_ir * A_face * vf
-        q_abs_avg = q_solar_avg + q_albedo_avg + q_ir_avg
-        T_eq = ((q_abs_avg / (self.emissivity * sigma * A_rad)) ** 0.25) - 273.15
-
-        q_hot = self.solar_constant * self.absorptivity * A_face \
-                + self.albedo * self.solar_constant *
+        q_ir_avg = self.earth
