@@ -6,6 +6,15 @@ import numpy as np
 import plotly.graph_objects as go
 import json
 
+# === PRO TIER LOCK ===
+if not st.session_state.get("pro_user", False):
+    st.warning("🔒 **Free Tier**: Limited to 400 km, 2W heat")
+    st.info("**Upgrade to Pro ($199/mo)** → Unlimited altitudes, multi-satellite, thermal optimization")
+    if st.button("🚀 Unlock Pro"):
+        st.success("Redirecting to Stripe...")
+        # Stripe link will go here
+    st.stop()
+
 st.set_page_config(page_title="CubeSim Pro", layout="centered")
 st.title("CubeSim Pro — NASA-Validated 1U CubeSat Simulator")
 
