@@ -51,37 +51,4 @@ class CubeSatSim:
         q_abs_avg = q_solar_avg + q_albedo_avg + q_ir_avg
         T_eq = ((q_abs_avg / (self.emissivity * sigma * A_rad)) ** 0.25) - 273.15
 
-        q_hot = self.solar_constant * self.absorptivity * A_face \
-                + self.albedo * self.solar_constant * self.absorptivity * A_face * vf \
-                + self.earth_ir * self.emissivity * A_face * vf
-        A_rad_hot = 0.00851
-        T_hot = (q_hot / (self.emissivity * sigma * A_rad_hot)) ** 0.25 - 273.15
-
-        q_cold = self.earth_ir * self.emissivity * A_face * vf
-        A_rad_cold = 0.00933
-        T_cold = (q_cold / (self.emissivity * sigma * A_rad_cold)) ** 0.25 - 273.15
-
-        return {
-            'Equilibrium Temp (°C)': round(T_eq, 1),
-            'Hot Face (°C)': round(T_hot, 1),
-            'Cold Face (°C)': round(T_cold, 1)
-        }
-
-    def simulate_orbit_3d(self, num_points=200):
-        # Parametric circular orbit in XY plane
-        theta = np.linspace(0, 2 * np.pi, num_points)
-        radius = 6371 + self.altitude_km  # km
-        x = radius * np.cos(theta)
-        y = radius * np.sin(theta)
-        z = np.zeros_like(theta)  # equatorial for simplicity
-        return x, y, z
-
-# --- Streamlit App ---
-st.set_page_config(page_title="CubeSat Simulator", layout="wide")
-st.title("🚀 NASA-Accurate CubeSat Simulator")
-st.markdown("**GeneSat-1 Validated • 1U CubeSat • Live 3D Orbit**")
-
-# Sidebar Controls
-with st.sidebar:
-    st.header("Mission Parameters")
-    altitude = st.slider
+        q_hot = self.solar_constant * self.absor
