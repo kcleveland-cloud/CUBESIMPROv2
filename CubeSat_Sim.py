@@ -72,9 +72,11 @@ class CubeSatSim:
     def simulate_orbit_3d(self, num_points=200):
         theta = np.linspace(0, 2 * np.pi, num_points)
         radius = 6371 + self.altitude_km
+        # Inclined orbit: rotate around X-axis
+        inc = self.inclination
         x = radius * np.cos(theta)
-        y = radius * np.sin(theta)
-        z = np.zeros_like(theta)
+        y = radius * np.sin(theta) * np.cos(inc)
+        z = radius * np.sin(theta) * np.sin(inc)
         return x, y, z
 
     def simulate_orbit(self, num_orbits=10):
@@ -86,7 +88,7 @@ class CubeSatSim:
 # --- Streamlit App ---
 st.set_page_config(page_title="CubeSat Simulator", layout="wide")
 st.title("NASA-Accurate CubeSat Simulator")
-st.markdown("**GeneSat-1 Validated • 1U CubeSat • Animated 3D Orbit**")
+st.markdown("**GeneSat-1 Validated • 1U CubeSat • Inclined 3D Orbit Animation**")
 
 # Sidebar
 with st.sidebar:
@@ -100,11 +102,11 @@ sim = CubeSatSim(altitude, inclination)
 
 tab1, tab2, tab3 = st.tabs(["3D Orbit", "Power", "Thermal"])
 
-# === TAB 1: ANIMATED 3D ORBIT ===
+# === TAB 1: ANIMATED INCLINED ORBIT ===
 with tab1:
-    st.subheader("Live 3D Orbital Animation")
+    st.subheader("Live 3D Inclined Orbit Animation")
 
-    # Generate orbit points
+    # Generate orbit points with inclination
     x_orbit, y_orbit, z_orbit = sim.simulate_orbit_3d()
 
     # Frames for animation
@@ -165,7 +167,7 @@ with tab1:
         frames=frames
     )
 
-    # Add Earth wireframe to all frames
+    # Add Earth wireframe
     earth_radius = 6371
     u = np.linspace(0, 2 * np.pi, 20)
     v = np.linspace(0, np.pi, 10)
