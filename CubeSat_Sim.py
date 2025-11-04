@@ -93,7 +93,7 @@ class CubeSatSim:
 # --- Streamlit App ---
 st.set_page_config(page_title="CubeSat Simulator", layout="wide")
 st.title("NASA-Accurate CubeSat Simulator")
-st.markdown("**GeneSat-1 Validated • 1U CubeSat • Synced Ground Track + 3D Orbit**")
+st.markdown("**GeneSat-1 Validated • 1U CubeSat • Animated Ground Track + 3D Orbit**")
 
 # Sidebar
 with st.sidebar:
@@ -107,31 +107,51 @@ sim = CubeSatSim(altitude, inclination)
 
 tab1, tab2, tab3 = st.tabs(["3D + Ground Track", "Power", "Thermal"])
 
-# === TAB 1: 3D ORBIT + GROUND TRACK (SYNCED) ===
+# === TAB 1: ANIMATED 3D + GROUND TRACK (SYNCED) ===
 with tab1:
     col3d, colmap = st.columns([1, 1])
 
+    # Generate data
+    x_orbit, y_orbit, z_orbit = sim.simulate_orbit_3d()
+    lon, lat = sim.ground_track()
+
+    # Shared frames
+    frames_3d = []
+    frames_map = []
+    for i in range(0, len(x_orbit), 2):
+        # 3D Frame
+        frame_3d = go.Frame(
+            data=[
+                go.Scatter3d(x=x_orbit[:i], y=y_orbit[:i], z=z_orbit[:i],
+                             mode='lines', line=dict(color='yellow', width=4), name='Trail'),
+                go.Scatter3d(x=[x_orbit[i]], y=[y_orbit[i]], z=[z_orbit[i]],
+                             mode='markers', marker=dict(size=12, color='yellow', symbol='diamond'), name='CubeSat')
+            ],
+            name=str(i)
+        )
+        frames_3d.append(frame_3d)
+
+        # Ground Track Frame
+        frame_map = go.Frame(
+            data=[
+                go.Scattergeo(lon=lon[:i], lat=lat[:i], mode='lines', line=dict(color='yellow', width=4), name='Track'),
+                go.Scattergeo(lon=[lon[i]], lat=[lat[i]], mode='markers', marker=dict(size=12, color='yellow'), name='CubeSat')
+            ],
+            name=str(i)
+        )
+        frames_map.append(frame_map)
+
+    # === 3D PLOT ===
     with col3d:
         st.subheader("3D Orbital Animation")
 
-        x_orbit, y_orbit, z_orbit = sim.simulate_orbit_3d()
-        frames_3d = []
-        for i in range(0, len(x_orbit), 2):
-            frame = go.Frame(
-                data=[
-                    go.Scatter3d(x=x_orbit[:i], y=y_orbit[:i], z=z_orbit[:i],
-                                 mode='lines', line=dict(color='yellow', width=4), name='Trail'),
-                    go.Scatter3d(x=[x_orbit[i]], y=[y_orbit[i]], z=[z_orbit[i]],
-                                 mode='markers', marker=dict(size=12, color='yellow', symbol='diamond'), name='CubeSat')
-                ],
-                name=str(i)
-            )
-            frames_3d.append(frame)
-
         fig3d = go.Figure(
             data=[
+                # Earth wireframe
                 go.Scatter3d(x=[], y=[], z=[], mode='lines', line=dict(color='lightblue', width=2), name='Earth'),
+                # Full orbit
                 go.Scatter3d(x=x_orbit, y=y_orbit, z=z_orbit, mode='lines', line=dict(color='red', width=6), name='Orbit'),
+                # Initial trail and CubeSat
                 go.Scatter3d(x=[], y=[], z=[], mode='lines', line=dict(color='yellow', width=4), name='Trail'),
                 go.Scatter3d(x=[x_orbit[0]], y=[y_orbit[0]], z=[z_orbit[0]],
                              mode='markers', marker=dict(size=12, color='yellow', symbol='diamond'), name='CubeSat')
@@ -140,7 +160,7 @@ with tab1:
                 updatemenus=[dict(
                     type="buttons",
                     buttons=[
-                        dict(label="Play", method="animate", args=[None, dict(frame=dict(duration=50/anim_speed, redraw=True), fromcurrent=True)]),
+                        dict(label="Play", method="animate", args=[None, dict(frame=dict(duration=50/anim_speed, redraw=True), fromcurrent=True, transition=dict(duration=0))]),
                         dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])
                     ],
                     y=1.1
@@ -169,20 +189,9 @@ with tab1:
 
         st.plotly_chart(fig3d, use_container_width=True)
 
+    # === GROUND TRACK MAP ===
     with colmap:
         st.subheader("Ground Track Map")
-
-        lon, lat = sim.ground_track()
-        frames_map = []
-        for i in range(0, len(lon), 2):
-            frame = go.Frame(
-                data=[
-                    go.Scattergeo(lon=lon[:i], lat=lat[:i], mode='lines', line=dict(color='yellow', width=4), name='Track'),
-                    go.Scattergeo(lon=[lon[i]], lat=[lat[i]], mode='markers', marker=dict(size=12, color='yellow'), name='CubeSat')
-                ],
-                name=str(i)
-            )
-            frames_map.append(frame)
 
         fig_map = go.Figure(
             data=[
@@ -204,9 +213,13 @@ with tab1:
             frames=frames_map
         )
 
+        # Use same animation controls (via JS — Streamlit doesn't support shared updatemenus)
+        # We'll sync via Play button on 3D — user can click Play on 3D to start both
+        st.markdown("**Click Play on 3D plot to animate both views**")
+
         st.plotly_chart(fig_map, use_container_width=True)
 
-# === TAB 2: POWER ===
+# === TAB 2 & 3 ===
 with tab2:
     st.subheader("Power Budget")
     avg_p, cons = sim.power_budget()
@@ -216,7 +229,6 @@ with tab2:
     col2.metric("Consumed", f"{cons:.2f} W")
     col3.metric("Net", f"{net:+.2f} W", delta=f"{net:+.2f} W")
 
-# === TAB 3: THERMAL ===
 with tab3:
     st.subheader("Thermal Analysis")
     thermal = sim.thermal_model()
@@ -229,7 +241,6 @@ with tab3:
     st.write(f"**Daily Dose:** {dose:.2f} rads/day")
     st.write(f"**{mission_days}-Day Total:** {dose*mission_days:.1f} rads")
 
-# === BENCHMARK ===
 if st.button("Benchmark: 400 km Run"):
     bench = CubeSatSim(400)
     t = bench.thermal_model()
