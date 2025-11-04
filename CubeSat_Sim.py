@@ -86,16 +86,14 @@ class CubeSatSim:
 
     def ground_track(self, num_points=200):
         theta = np.linspace(0, 2 * np.pi, num_points)
-        # Longitude = theta (in radians) → degrees
         lon = np.degrees(theta)
-        # Latitude from inclination
-        lat = np.degrees(np.arcsin(np.sin(theta) * np.sin(self.inclination)))
+        lat = np.degrees(np.sin(theta) * np.sin(self.inclination))
         return lon, lat
 
 # --- Streamlit App ---
 st.set_page_config(page_title="CubeSat Simulator", layout="wide")
 st.title("NASA-Accurate CubeSat Simulator")
-st.markdown("**GeneSat-1 Validated • 1U CubeSat • Ground Track + 3D Orbit**")
+st.markdown("**GeneSat-1 Validated • 1U CubeSat • Synced Ground Track + 3D Orbit**")
 
 # Sidebar
 with st.sidebar:
@@ -109,14 +107,13 @@ sim = CubeSatSim(altitude, inclination)
 
 tab1, tab2, tab3 = st.tabs(["3D + Ground Track", "Power", "Thermal"])
 
-# === TAB 1: 3D ORBIT + GROUND TRACK ===
+# === TAB 1: 3D ORBIT + GROUND TRACK (SYNCED) ===
 with tab1:
     col3d, colmap = st.columns([1, 1])
 
     with col3d:
         st.subheader("3D Orbital Animation")
 
-        # 3D Plot
         x_orbit, y_orbit, z_orbit = sim.simulate_orbit_3d()
         frames_3d = []
         for i in range(0, len(x_orbit), 2):
@@ -173,11 +170,9 @@ with tab1:
         st.plotly_chart(fig3d, use_container_width=True)
 
     with colmap:
-        st.subheader("Ground Track")
+        st.subheader("Ground Track Map")
 
         lon, lat = sim.ground_track()
-
-        # Frames for ground track animation
         frames_map = []
         for i in range(0, len(lon), 2):
             frame = go.Frame(
@@ -211,7 +206,7 @@ with tab1:
 
         st.plotly_chart(fig_map, use_container_width=True)
 
-# === TAB 2 & 3 ===
+# === TAB 2: POWER ===
 with tab2:
     st.subheader("Power Budget")
     avg_p, cons = sim.power_budget()
@@ -221,6 +216,7 @@ with tab2:
     col2.metric("Consumed", f"{cons:.2f} W")
     col3.metric("Net", f"{net:+.2f} W", delta=f"{net:+.2f} W")
 
+# === TAB 3: THERMAL ===
 with tab3:
     st.subheader("Thermal Analysis")
     thermal = sim.thermal_model()
@@ -233,6 +229,7 @@ with tab3:
     st.write(f"**Daily Dose:** {dose:.2f} rads/day")
     st.write(f"**{mission_days}-Day Total:** {dose*mission_days:.1f} rads")
 
+# === BENCHMARK ===
 if st.button("Benchmark: 400 km Run"):
     bench = CubeSatSim(400)
     t = bench.thermal_model()
