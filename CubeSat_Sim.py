@@ -143,7 +143,7 @@ with tab1:
     # === WIRE EARTH ANIMATION ===
     st.markdown("### Wire Earth Animation (CubeSat Orbit Only)")
 
-    # Safe init
+    # SAFE INIT
     if 'play_wire' not in st.session_state:
         st.session_state.play_wire = False
 
