@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 
-# --- SAFE SESSION STATE INIT (TOP OF FILE) ---
+# --- SAFE SESSION STATE INIT ---
 if 'play_wire' not in st.session_state:
     st.session_state.play_wire = False
 if 'play_flat' not in st.session_state:
@@ -133,13 +133,8 @@ with tab1:
     # === WIRE EARTH ANIMATION ===
     st.markdown("### Wire Earth Animation (CubeSat Orbit Only)")
 
-    # ONE BUTTON LOGIC
-    if st.session_state.play_wire:
-        if st.button("Pause Wire Earth"):
-            st.session_state.play_wire = False
-            st.rerun()
-    else:
-        if st.button("Play Wire Earth"):
+    if not st.session_state.play_wire:
+        if st.button("Play Wire Earth", key="play_wire"):
             st.session_state.play_wire = True
             st.rerun()
 
@@ -176,7 +171,7 @@ with tab1:
         fig_wire.update_layout(
             updatemenus=[dict(
                 type="buttons",
-                buttons=[dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])]
+                buttons=[dict(label="Play", method="animate", args=[None, dict(frame=dict(duration=50/anim_speed, redraw=True), fromcurrent=True, mode="immediate")])]
             )]
         )
 
@@ -185,12 +180,8 @@ with tab1:
     # === FLAT EARTH ANIMATION ===
     st.markdown("### Flat Earth Ground Track")
 
-    if st.session_state.play_flat:
-        if st.button("Pause Flat Earth"):
-            st.session_state.play_flat = False
-            st.rerun()
-    else:
-        if st.button("Play Flat Earth"):
+    if not st.session_state.play_flat:
+        if st.button("Play Flat Earth", key="play_flat"):
             st.session_state.play_flat = True
             st.rerun()
 
@@ -211,7 +202,7 @@ with tab1:
         fig_flat.update_layout(
             updatemenus=[dict(
                 type="buttons",
-                buttons=[dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])]
+                buttons=[dict(label="Play", method="animate", args=[None, dict(frame=dict(duration=50/anim_speed, redraw=True), fromcurrent=True, mode="immediate")])]
             )]
         )
 
@@ -220,12 +211,8 @@ with tab1:
     # === GLOBE ANIMATION ===
     st.markdown("### Globe Ground Track")
 
-    if st.session_state.play_globe:
-        if st.button("Pause Globe"):
-            st.session_state.play_globe = False
-            st.rerun()
-    else:
-        if st.button("Play Globe"):
+    if not st.session_state.play_globe:
+        if st.button("Play Globe", key="play_globe"):
             st.session_state.play_globe = True
             st.rerun()
 
@@ -246,7 +233,7 @@ with tab1:
         fig_globe.update_layout(
             updatemenus=[dict(
                 type="buttons",
-                buttons=[dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])]
+                buttons=[dict(label="Play", method="animate", args=[None, dict(frame=dict(duration=50/anim_speed, redraw=True), fromcurrent=True, mode="immediate")])]
             )]
         )
 
@@ -270,15 +257,4 @@ with tab3:
     fig_bar = px.bar(df, x='Case', y='Temperature (°C)', color='Case')
     st.plotly_chart(fig_bar, use_container_width=True)
 
-    st.subheader("Radiation Exposure")
-    dose = 0.5 + (sim.altitude_km - 200) * 0.002 if sim.altitude_km < 1000 else 5.0 + (sim.altitude_km - 1000) * 0.01
-    st.write(f"**Daily Dose:** {dose:.2f} rads/day")
-    st.write(f"**{mission_days}-Day Total:** {dose*mission_days:.1f} rads")
-
-if st.button("Benchmark: 400 km Run"):
-    bench = CubeSatSim(400)
-    t = bench.thermal_model()
-    st.success("**GeneSat-1 Validated:**")
-    st.write(f"• Equilibrium: **{t['Equilibrium Temp (°C)']}°C**")
-    st.write(f"• Hot Face: **{t['Hot Face (°C)']}°C**")
-    st.write(f"• Cold Face: **{t['Cold Face (°C)']}°C**")
+   
