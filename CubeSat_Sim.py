@@ -18,7 +18,7 @@ import plotly.express as px
 # =========================
 st.set_page_config(
     page_title="CATSIM — CubeSat Mission Simulator",
-    page_icon="🛰️",
+    page_icon="CATS_Logo.png",
     layout="wide"
 )
 
