@@ -330,8 +330,8 @@ with tab_orbit:
                 type="buttons",
                 direction="left",
                 showactive=False,
-                x=0.5, xanchor="center",
-                y=-0.1, yanchor="top",      # neatly below the plot
+                x=0.05, xanchor="left",
+                y=0.05, yanchor="bottom",   # inside bottom-left
                 pad={"r": 0, "t": 0},
                 buttons=[dict(
                     label="Play",
@@ -369,8 +369,8 @@ with tab_orbit:
                 type="buttons",
                 direction="left",
                 showactive=False,
-                x=0.5, xanchor="center",
-                y=-0.12, yanchor="top",     # slightly lower to clear geo title
+                x=0.05, xanchor="left",
+                y=0.05, yanchor="bottom",   # inside bottom-left
                 pad={"r": 0, "t": 0},
                 buttons=[dict(
                     label="Play",
@@ -525,5 +525,5 @@ st.markdown("---")
 st.caption(
     "Corrected physics: cylindrical-shape eclipse fraction f = (1/π)asin(Re/(Re+h)); Earth view factor from angular radius; "
     "separate absorbing/radiating areas + internal heat for thermal; synchronized ECI→ECEF ground track; "
-    "play buttons centered below each plot; Save/Load/Export gated to Pro."
+    "Play buttons placed inside each plot (bottom-left); Save/Load/Export gated to Pro."
 )
