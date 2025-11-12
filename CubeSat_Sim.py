@@ -1,6 +1,10 @@
-# app.py — CubeSat Simulator (β-sweep, time-resolved SoC, drag fixed, GeneSat-validated, Pro-gated I/O)
+# app.py — CATSIM (CubeSat Mission Simulator)
+# Cleveland Aerospace Technology Services — Davidsonville, MD
+# Features: β-angle power, aligned ECI→ECEF ground track, time-resolved SoC,
+# thermal with Earth view factor, drag model, Pro-gated Save/Load/Export.
 import json
 import io
+import os
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -8,12 +12,41 @@ import plotly.graph_objects as go
 import plotly.express as px
 
 # =========================
+# Page setup & Branding
+# =========================
+st.set_page_config(page_title="CATSIM — CubeSat Mission Simulator", page_icon="🛰️", layout="wide")
+
+# ---- Header with Logo + Title ----
+def show_header():
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        # Try both common paths for your logo
+        logo_paths = ["CATS_Logo.png", "assets/CATS_Logo.png", "/mnt/data/CATS Logo.png"]
+        shown = False
+        for p in logo_paths:
+            if os.path.exists(p):
+                st.image(p, width=150)
+                shown = True
+                break
+        if not shown:
+            st.markdown("🛰️")  # fallback emoji
+    with col2:
+        st.markdown("""
+            # **CATSIM — CubeSat Mission Simulator**
+            #### by Cleveland Aerospace Technology Services  
+            *Davidsonville, Maryland, USA*
+        """)
+    st.markdown("---")
+
+show_header()
+
+# =========================
 # Physical constants (SI)
 # =========================
 MU = 3.986004418e14       # Earth's gravitational parameter (m^3/s^2)
 R_E = 6371e3              # Earth radius (m)
 OMEGA_E = 7.2921159e-5    # Earth rotation rate (rad/s)
-SIGMA = 5.670374419e-8    # Stefan–Boltzmann (W/m^2/K^4)
+SIGMA = 5.670374419e-8    # Stefan–Boltzmann constant (W/m^2/K^4)
 SOLAR_CONST = 1366.0      # W/m^2
 EARTH_IR = 237.0          # W/m^2
 ALBEDO = 0.3              # dimensionless
@@ -26,18 +59,20 @@ def clamp_angle_deg(a):
     return (a + 180.0) % 360.0 - 180.0
 
 def earth_view_factor(alt_m):
+    """Earth disk view factor from altitude h."""
     r = R_E + float(alt_m)
-    theta = np.arcsin(np.clip(R_E / r, -1.0, 1.0))
+    theta = np.arcsin(np.clip(R_E / r, -1.0, 1.0))  # Earth angular radius
     return (1.0 - np.cos(theta)) / 2.0
 
 def rho_msis_simple(h_m):
-    # Very simple exponential atmosphere ~200–600 km band
+    """Super-simple exponential atmosphere ~200–600 km band."""
     H = 60e3
     rho_200 = 2.5e-11
     h = np.maximum(h_m, 200e3)
     return np.clip(rho_200 * np.exp(-(h - 200e3)/H), 1e-13, None)
 
 def eci_to_ecef_xyz(x_eci, y_eci, z_eci, t):
+    """Rotate ECI about +Z by -OMEGA_E*t to get ECEF; arrays ok."""
     cosw = np.cos(OMEGA_E * t)
     sinw = np.sin(OMEGA_E * t)
     x_ecef =  cosw * x_eci + sinw * y_eci
@@ -45,16 +80,24 @@ def eci_to_ecef_xyz(x_eci, y_eci, z_eci, t):
     z_ecef =  z_eci
     return x_ecef, y_ecef, z_ecef
 
-# ---- Sun vector and eclipse with β-angle ----
+# ---- Sun vector & eclipse with β-angle ----
 def sun_vector_eci(incl_rad, beta_deg):
-    # Orbit normal (unit)
-    hhat = np.array([0.0, -np.sin(incl_rad), np.cos(incl_rad)])
+    """
+    Build a fixed Sun unit vector S in ECI given orbit inclination and β.
+    β is the angle between Sun vector and orbital plane (positive toward +ĥ).
+    In-plane projection aligned with +X ECI (line of nodes) for simplicity.
+    """
+    hhat = np.array([0.0, -np.sin(incl_rad), np.cos(incl_rad)])  # orbit normal
     cb = np.cos(np.radians(beta_deg)); sb = np.sin(np.radians(beta_deg))
     S = cb * np.array([1.0, 0.0, 0.0]) + sb * hhat
     S /= np.linalg.norm(S)
     return S
 
 def eclipse_mask_from_vec(x_km, y_km, z_km, S_vec):
+    """
+    Cylindrical shadow test with arbitrary Sun axis S_vec (unit).
+    r·S < 0   and   ||r - (r·S)S|| < R_E (km)
+    """
     r = np.vstack((x_km, y_km, z_km)).T
     S = np.asarray(S_vec, dtype=float)
     r_dot_S = r @ S
@@ -63,6 +106,10 @@ def eclipse_mask_from_vec(x_km, y_km, z_km, S_vec):
     return (r_dot_S < 0.0) & (dist_ax_sq < (R_E/1000.0)**2)
 
 def eclipse_fraction_beta(alt_m, beta_deg):
+    """
+    Orbit-averaged eclipse fraction for circular orbit, cylindrical shadow with β:
+    f = (1/π) * arccos( sqrt(1 - (Re/r)^2) / cos β ), if cosβ>0 and value<1; else 0.
+    """
     r = R_E + float(alt_m)
     Re_r = np.clip(R_E / r, 0.0, 1.0)
     root = np.sqrt(1.0 - Re_r**2)
@@ -112,7 +159,6 @@ class CubeSatSim:
         self.v = np.sqrt(MU/self.r)                    # m/s
         self.VF = earth_view_factor(self.h)            # Earth view factor
 
-        # Sun direction for this orbit (unit, ECI)
         self.S = sun_vector_eci(self.i, self.beta_deg)
 
     def set_beta(self, beta_deg):
@@ -152,7 +198,7 @@ class CubeSatSim:
         if attitude == "body-spin":
             cos_inc = np.full_like(t, 0.5)
         elif attitude == "sun-tracking":
-            cos_inc = np.ones_like(t)  # sun-pointing panel
+            cos_inc = np.ones_like(t)  # ideal sun-pointing panel
         elif attitude == "nadir-pointing":
             nhat = -rhat
             cos_inc = nhat @ S
@@ -193,7 +239,28 @@ class CubeSatSim:
         P = SOLAR_CONST * A_panel * eta * cos_inc
         return float(P.mean())
 
-    # ---------- Drag decay (RESTORED) ----------
+    # ---------- Thermal (avg equilibrium) ----------
+    def thermal_equilibrium(self, A_abs=None, A_rad=None, Q_internal_W=0.0):
+        """
+        Q_solar_avg + Q_albedo_avg + Q_IR + Q_internal = ε σ A_rad T^4
+        """
+        if A_abs is None:
+            A_abs = self.A_panel
+        if A_rad is None:
+            A_rad = 6.0 * self.A_panel
+
+        efrac = self.eclipse_fraction()
+        VF = self.VF
+
+        Q_solar = SOLAR_CONST * self.alpha * A_abs * (1.0 - efrac)
+        Q_albedo = ALBEDO * SOLAR_CONST * self.alpha * A_abs * VF * (1.0 - efrac)
+        Q_ir = EARTH_IR * self.eps * A_abs * VF
+        Q_total = Q_solar + Q_albedo + Q_ir + float(Q_internal_W)
+
+        T_K = (Q_total / (self.eps * SIGMA * A_rad)) ** 0.25
+        return float(T_K - 273.15), Q_solar, Q_albedo, Q_ir, float(Q_internal_W), float(Q_total)
+
+    # ---------- Drag decay (simple daily integration) ----------
     def drag_decay_days(self, days, A_drag=None):
         """
         Super-simplified circular-orbit drag model integrating semi-major axis daily.
@@ -203,26 +270,21 @@ class CubeSatSim:
         out = []
         for _ in range(int(days)):
             rho = rho_msis_simple(a - R_E)  # kg/m^3
-            # da/dt ≈ - (Cd * A / m) * sqrt(μ * a) * ρ
             da_dt = - (self.Cd * A / self.m) * np.sqrt(MU * a) * rho
             a = a + da_dt * DAY_SEC
-            if a < R_E + 120e3:
+            if a < R_E + 120e3:  # floor at ~120 km
                 a = R_E + 120e3
             out.append(a - R_E)
         return np.array(out) / 1000.0  # km
 
 # =========================
-# App header & subscription stub
+# Session & Sidebar controls
 # =========================
-st.set_page_config(page_title="CubeSat Simulator — Phase 1", layout="wide")
-st.title("🛰️ CubeSat Simulator — Phase 1")
-
-# Session defaults
 if "user" not in st.session_state: st.session_state.user = None
 if "plan" not in st.session_state: st.session_state.plan = "Free"
 
 with st.sidebar:
-    st.header("Sign in (stub)")
+    st.header("Account")
     if st.session_state.user is None:
         email = st.text_input("Email")
         if st.button("Sign in"):
@@ -237,7 +299,7 @@ with st.sidebar:
     st.markdown(f"**Current plan:** {st.session_state.plan}")
     if st.session_state.plan == "Free":
         if st.button("Upgrade to Pro ($9/mo)"):
-            st.session_state.plan = "Pro"  # stub
+            st.session_state.plan = "Pro"  # stub for launch
     else:
         st.success("Pro features unlocked ✓")
 
@@ -275,7 +337,9 @@ with st.sidebar:
     anim_speed = st.slider("Animation speed (Plotly)", 0.1, 5.0, 1.0, 0.1)
     mission_days = st.slider("Mission duration (days)", 1, 365, 60)
 
-# Build simulator & optional power calibration
+# =========================
+# Build simulator & calibration
+# =========================
 sim = CubeSatSim(
     altitude_km=altitude_km, incl_deg=incl_deg, mass_kg=mass_kg,
     Cd=Cd, panel_area_m2=panel_area, panel_eff=panel_eff,
@@ -329,30 +393,39 @@ with tab_orbit:
                                  mode="markers", marker=dict(size=6, color="red"),
                                  name="Sat"))
 
+    # Animate only the marker (Earth/path persist)
     frames3d = []
     step = 4
     for k in range(0, len(x_km), step):
-        frames3d.append(go.Frame(name=str(k),
+        frames3d.append(go.Frame(
+            name=str(k),
             data=[go.Scatter3d(x=[x_km[k]], y=[y_km[k]], z=[z_km[k]],
                                mode="markers", marker=dict(size=6, color="red"))],
-            traces=[3]))
+            traces=[3]
+        ))
     fig3d.frames = frames3d
     fig3d.update_layout(scene=dict(aspectmode="data"),
                         height=560, showlegend=True,
                         margin=dict(l=0, r=0, t=0, b=0),
                         uirevision="keep-earth")
     if show_play:
-        fig3d.update_layout(updatemenus=[dict(
-            type="buttons", direction="left", showactive=False,
-            x=0.05, xanchor="left", y=0.05, yanchor="bottom",
-            pad={"r": 0, "t": 0},
-            buttons=[dict(label="Play", method="animate",
-                          args=[None, dict(frame=dict(duration=int(40/anim_speed), redraw=True),
-                                           fromcurrent=True, mode="immediate")])]
-        )])
+        fig3d.update_layout(
+            updatemenus=[dict(
+                type="buttons", direction="left", showactive=False,
+                x=0.05, xanchor="left", y=0.05, yanchor="bottom",
+                pad={"r": 0, "t": 0},
+                buttons=[dict(
+                    label="Play", method="animate",
+                    args=[None, dict(
+                        frame=dict(duration=int(40/anim_speed), redraw=True),
+                        fromcurrent=True, mode="immediate"
+                    )]
+                )]
+            )]
+        )
     st.plotly_chart(fig3d, use_container_width=True)
 
-    # Ground track + marker
+    # Ground track + marker (synchronized)
     fig_gt = go.Figure()
     fig_gt.add_trace(go.Scattergeo(lon=lon_deg, lat=lat_deg, mode="lines",
                                    line=dict(color="royalblue", width=2), name="Path"))
@@ -360,22 +433,30 @@ with tab_orbit:
                                    marker=dict(size=6, color="red"), name="Sat"))
     frames_gt = []
     for k in range(0, len(lon_deg), step):
-        frames_gt.append(go.Frame(name=str(k),
+        frames_gt.append(go.Frame(
+            name=str(k),
             data=[go.Scattergeo(lon=[lon_deg[k]], lat=[lat_deg[k]],
                                 mode="markers", marker=dict(size=6, color="red"))],
-            traces=[1]))
+            traces=[1]
+        ))
     fig_gt.frames = frames_gt
     fig_gt.update_layout(geo=dict(projection_type="natural earth", showland=True),
                          height=360, margin=dict(t=10), uirevision="keep-gt")
     if show_play:
-        fig_gt.update_layout(updatemenus=[dict(
-            type="buttons", direction="left", showactive=False,
-            x=0.05, xanchor="left", y=0.05, yanchor="bottom",
-            pad={"r": 0, "t": 0},
-            buttons=[dict(label="Play", method="animate",
-                          args=[None, dict(frame=dict(duration=int(40/anim_speed), redraw=True),
-                                           fromcurrent=True, mode="immediate")])]
-        )])
+        fig_gt.update_layout(
+            updatemenus=[dict(
+                type="buttons", direction="left", showactive=False,
+                x=0.05, xanchor="left", y=0.05, yanchor="bottom",
+                pad={"r": 0, "t": 0},
+                buttons=[dict(
+                    label="Play", method="animate",
+                    args=[None, dict(
+                        frame=dict(duration=int(40/anim_speed), redraw=True),
+                        fromcurrent=True, mode="immediate"
+                    )]
+                )]
+            )]
+        )
     st.plotly_chart(fig_gt, use_container_width=True)
 
     c1, c2, c3 = st.columns(3)
@@ -385,25 +466,27 @@ with tab_orbit:
     st.caption("Tip: increasing |β| shortens/eradicates eclipse; beyond a critical β there's no eclipse.")
 
 # =========================
-# TAB 2: POWER (with time-resolved SoC)
+# TAB 2: POWER (time-resolved SoC)
 # =========================
 with tab_power:
     st.subheader("Power — instantaneous, average, β-sweep, and SoC (time-resolved)")
-    st.caption("**Power Reality Check:** Orbit-average power (OAP) is often 30–60% of panel peak. "
-               "Benchmarks: GeneSat-1 ≈ 4–5 W OAP (3U body-mounted), typical 1U body-mounted ≈ 1–2 W OAP.")
+    st.caption("Orbit-average power is usually 30–60% of peak. Benchmarks: GeneSat-1 ≈ 4–5 W OAP (3U body-mounted).")
 
     # Orbit power profile (one orbit)
     N_orbit = 720
     t_orb, u, x_km, y_km, z_km = sim.orbit_eci(N=N_orbit)
     dt = float(t_orb[1] - t_orb[0])
     P_inst, cos_inc, ecl = sim.instantaneous_power(attitude, t_orb, x_km, y_km, z_km, sim.A_panel, sim.eta)
+    # Apply calibration toward target (for presets) + electrical derate
     P_inst = P_inst * cal_factor * elec_derate
 
     # Instantaneous power plot
-    figP = px.line(x=(t_orb/t_orb[-1])*360.0, y=P_inst,
-                   labels={"x":"Orbit phase (deg)", "y":"Power (W)"},
-                   title=f"Instantaneous Power — {attitude} (cal {cal_factor:.2f} × derate {elec_derate:.2f} @ β={beta_deg:.1f}°)")
-    st.plotly_chart(figP, use_container_width=True)
+    st.plotly_chart(
+        px.line(x=(t_orb/t_orb[-1])*360.0, y=P_inst,
+                labels={"x":"Orbit phase (deg)", "y":"Power (W)"},
+                title=f"Instantaneous Power — {attitude} (cal {cal_factor:.2f} × derate {elec_derate:.2f} @ β={beta_deg:.1f}°)"),
+        use_container_width=True
+    )
 
     # β-sweep (OAP vs β)
     st.markdown("### β-angle sweep: Orbit-average power vs β")
@@ -411,12 +494,14 @@ with tab_power:
     oap = np.array([sim.avg_power_at_beta(attitude, b, sim.A_panel, sim.eta) for b in betas])
     oap_scaled = oap * cal_factor * elec_derate
     df_beta = pd.DataFrame({"beta_deg": betas, "OAP_W": oap_scaled})
-    fig_beta = px.line(df_beta, x="beta_deg", y="OAP_W",
-                       title="Orbit-average Power vs β-angle",
-                       labels={"beta_deg":"β (deg)", "OAP_W":"Orbit-average Power (W)"})
-    st.plotly_chart(fig_beta, use_container_width=True)
+    st.plotly_chart(
+        px.line(df_beta, x="beta_deg", y="OAP_W",
+                title="Orbit-average Power vs β-angle",
+                labels={"beta_deg":"β (deg)", "OAP_W":"Orbit-average Power (W)"}),
+        use_container_width=True
+    )
 
-    # ---------- Time-resolved SoC simulation ----------
+    # ---------- Time-resolved SoC ----------
     st.markdown("### Battery & Load")
     cons_W = st.slider("Average consumption (W)", 0.1, 50.0, 3.0, 0.1)
     batt_Wh = st.slider("Battery capacity (Wh)", 5.0, 1000.0, 30.0, 1.0)
@@ -448,6 +533,7 @@ with tab_power:
             soc_wh = max(soc_wh - dE_Wh, 0.0)
         soc_series[k] = 100.0 * soc_wh / batt_Wh
 
+    # Downsample for plotting if very long
     max_pts = 5000
     if total_steps > max_pts:
         idx = np.linspace(0, total_steps-1, max_pts).astype(int)
@@ -457,6 +543,7 @@ with tab_power:
         ts_plot = t_timeline / 3600.0
         soc_plot = soc_series
 
+    # End-of-day SoC
     eod_idx = (np.arange(1, mission_days+1) * int(np.floor(DAY_SEC/dt))).clip(0, total_steps-1)
     eod_soc = soc_series[eod_idx]
     df_soc_daily = pd.DataFrame({"Day": np.arange(1, len(eod_idx)+1), "SoC (%)": eod_soc})
@@ -477,9 +564,9 @@ with tab_power:
                             title="Battery SoC — end of each day"),
                     use_container_width=True)
 
-    if eod_soc[-1] < 20.0:
+    if len(eod_soc) and eod_soc[-1] < 20.0:
         st.warning("Projected final SoC < 20% — consider more panel area/efficiency, better pointing, or lower load.")
-    else:
+    elif len(eod_soc):
         st.success("Battery SoC projection looks acceptable.")
 
 # =========================
@@ -491,18 +578,11 @@ with tab_thermal:
     A_rad = st.number_input("Radiating area A_rad (m²)", 0.005, 2.0, 6.0*sim.A_panel, 0.005)
     Q_int = st.number_input("Internal dissipation Q_internal (W)", 0.0, 50.0, 0.0, 0.1)
 
-    efrac = sim.eclipse_fraction()
-    VF = sim.VF
-    Q_solar = SOLAR_CONST * sim.alpha * A_abs * (1.0 - efrac)
-    Q_albedo = ALBEDO * SOLAR_CONST * sim.alpha * A_abs * VF * (1.0 - efrac)
-    Q_ir = EARTH_IR * sim.eps * A_abs * VF
-    Q_total = Q_solar + Q_albedo + Q_ir + Q_int
-    T_K = (Q_total / (sim.eps * SIGMA * A_rad)) ** 0.25
-    T_c = float(T_K - 273.15)
-
+    T_c, Qs, Qa, Qir, Qin, Qtot = sim.thermal_equilibrium(A_abs=A_abs, A_rad=A_rad, Q_internal_W=Q_int)
     st.metric("Equilibrium temperature (°C)", f"{T_c:.2f}")
-    dfQ = pd.DataFrame([{"Solar_avg_W": Q_solar, "Albedo_W": Q_albedo, "Earth_IR_W": Q_ir,
-                         "Internal_W": Q_int, "Total_abs_W": Q_total}])
+
+    dfQ = pd.DataFrame([{"Solar_avg_W": Qs, "Albedo_W": Qa, "Earth_IR_W": Qir,
+                         "Internal_W": Qin, "Total_abs_W": Qtot}])
     st.dataframe(dfQ, use_container_width=True)
     st.plotly_chart(px.bar(dfQ.melt(var_name="Component", value_name="W"),
                            x="Component", y="W", title="Absorbed power components"),
@@ -546,7 +626,7 @@ with tab_io:
     st.download_button("Download Mission JSON", data=json_bytes,
                        file_name="mission.json", mime="application/json")
 
-    # Export orbit & power CSVs (one orbit)
+    # Export one-orbit ECI & Power
     t_orb, u_orb, x_orb, y_orb, z_orb = sim.orbit_eci(N=720)
     P_orb, _, _ = sim.instantaneous_power(attitude, t_orb, x_orb, y_orb, z_orb, sim.A_panel, sim.eta)
     P_orb = P_orb * cal_factor * elec_derate
@@ -562,8 +642,14 @@ with tab_io:
     buf_porb = io.StringIO(); df_power_orbit.to_csv(buf_porb, index=False)
     st.download_button("Export One-Orbit Power CSV", buf_porb.getvalue(), file_name="power_one_orbit.csv", mime="text/csv")
 
-st.markdown("---")
-st.caption(
-    "Fix: restored drag model to resolve AttributeError. Includes β-angle support, time-resolved SoC, aligned ECI→ECEF ground track, "
-    "inside-plot Play buttons, electrical derate slider, corrected thermal with user α/ε, and Pro-gated Save/Load/Export."
-)
+# =========================
+# Footer
+# =========================
+st.markdown("""
+<hr>
+<p style='text-align: center; color: gray; font-size: 0.9em;'>
+© 2025 Cleveland Aerospace Technology Services — Davidsonville, MD<br>
+<a href="mailto:press@clevelandaerospace.com">press@clevelandaerospace.com</a> •
+<a href="mailto:support@clevelandaerospace.com">support@clevelandaerospace.com</a>
+</p>
+""", unsafe_allow_html=True)
