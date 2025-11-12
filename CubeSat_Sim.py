@@ -153,11 +153,11 @@ with tab1:
 
     col_wire = st.columns([1, 1, 1])
     with col_wire[0]:
-        if st.button("Play Wire Earth", key="play_wire_btn"):
+        if st.button("Play Wire Earth", key="play_wire"):
             st.session_state.play_wire = True
             st.rerun()
     with col_wire[1]:
-        if st.button("Pause", key="pause_wire_btn"):
+        if st.button("Pause", key="pause_wire"):
             st.session_state.play_wire = False
             st.rerun()
 
@@ -191,6 +191,18 @@ with tab1:
     z_earth = earth_radius * np.outer(np.ones(np.size(u)), np.cos(v)).flatten()
     fig_wire.add_trace(go.Scatter3d(x=x_earth, y=y_earth, z=z_earth, mode='lines', line=dict(color='lightblue', width=2)))
 
+    # Add updatemenus if playing
+    if st.session_state.play_wire:
+        fig_wire.update_layout(
+            updatemenus=[dict(
+                type="buttons",
+                buttons=[
+                    dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])
+                ],
+                y=1.1
+            )]
+        )
+
     st.plotly_chart(fig_wire, use_container_width=True)
 
     # === FLAT EARTH ANIMATION ===
@@ -198,11 +210,11 @@ with tab1:
 
     col_flat = st.columns([1, 1, 1])
     with col_flat[0]:
-        if st.button("Play Flat Earth", key="play_flat_btn"):
+        if st.button("Play Flat Earth", key="play_flat"):
             st.session_state.play_flat = True
             st.rerun()
     with col_flat[1]:
-        if st.button("Pause", key="pause_flat_btn"):
+        if st.button("Pause", key="pause_flat"):
             st.session_state.play_flat = False
             st.rerun()
 
@@ -225,6 +237,17 @@ with tab1:
         frames=frames
     )
 
+    if st.session_state.play_flat:
+        fig_flat.update_layout(
+            updatemenus=[dict(
+                type="buttons",
+                buttons=[
+                    dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])
+                ],
+                y=1.1
+            )]
+        )
+
     st.plotly_chart(fig_flat, use_container_width=True)
 
     # === GLOBE ANIMATION ===
@@ -232,11 +255,11 @@ with tab1:
 
     col_globe = st.columns([1, 1, 1])
     with col_globe[0]:
-        if st.button("Play Globe", key="play_globe_btn"):
+        if st.button("Play Globe", key="play_globe"):
             st.session_state.play_globe = True
             st.rerun()
     with col_globe[1]:
-        if st.button("Pause", key="pause_globe_btn"):
+        if st.button("Pause", key="pause_globe"):
             st.session_state.play_globe = False
             st.rerun()
 
@@ -258,6 +281,17 @@ with tab1:
         ),
         frames=frames
     )
+
+    if st.session_state.play_globe:
+        fig_globe.update_layout(
+            updatemenus=[dict(
+                type="buttons",
+                buttons=[
+                    dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])
+                ],
+                y=1.1
+            )]
+        )
 
     st.plotly_chart(fig_globe, use_container_width=True)
 
