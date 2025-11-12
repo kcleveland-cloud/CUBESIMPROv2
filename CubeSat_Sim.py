@@ -107,15 +107,13 @@ sim = CubeSatSim(altitude, inclination)
 
 tab1, tab2, tab3 = st.tabs(["3D + Ground Track", "Power", "Thermal"])
 
-# === TAB 1: FULL-WIDTH ANIMATIONS ===
+# === TAB 1: CLEAN FULL-WIDTH ANIMATIONS ===
 with tab1:
-    # SINGLE PLAY/PAUSE
+    # SINGLE PLAY/PAUSE BUTTON
     col_play = st.columns([1, 1, 1])
     with col_play[1]:
-        if st.button("Play Animation", use_container_width=True):
-            st.session_state.play = True
-        if st.button("Pause", use_container_width=True):
-            st.session_state.play = False
+        play = st.button("Play Animation", use_container_width=True)
+        pause = st.button("Pause", use_container_width=True)
 
     # Generate data
     x_orbit, y_orbit, z_orbit = sim.simulate_orbit_3d()
@@ -140,18 +138,17 @@ with tab1:
             ]
         ))
 
-    # === FULL-WIDTH 3D ORBIT ===
+    # === FULL-WIDTH 3D ORBIT (NO WIREFRAME, NO SUN) ===
     st.markdown("### 3D Orbital Animation")
     fig3d = go.Figure(
         data=[
-            go.Scatter3d(x=[], y=[], z=[], mode='lines', line=dict(color='lightblue', width=2), name='Earth'),
+            # Static Orbit
             go.Scatter3d(x=x_orbit, y=y_orbit, z=z_orbit, mode='lines', line=dict(color='red', width=6), name='Orbit'),
+            # Initial Trail
             go.Scatter3d(x=[], y=[], z=[], mode='lines', line=dict(color='yellow', width=4), name='Trail'),
+            # Initial CubeSat
             go.Scatter3d(x=[x_orbit[0]], y=[y_orbit[0]], z=[z_orbit[0]],
-                         mode='markers', marker=dict(size=12, color='yellow', symbol='diamond'), name='CubeSat'),
-            # Sun arrow
-            go.Scatter3d(x=[0, 15000], y=[0, 0], z=[0, 0],
-                         mode='lines', line=dict(color='orange', width=8), name='Sun')
+                         mode='markers', marker=dict(size=12, color='yellow', symbol='diamond'), name='CubeSat')
         ],
         layout=go.Layout(
             updatemenus=[dict(
@@ -175,26 +172,18 @@ with tab1:
         frames=frames
     )
 
-    # Add Earth wireframe
-    earth_radius = 6371
-    u = np.linspace(0, 2 * np.pi, 20)
-    v = np.linspace(0, np.pi, 10)
-    x_earth = earth_radius * np.outer(np.cos(u), np.sin(v)).flatten()
-    y_earth = earth_radius * np.outer(np.sin(u), np.sin(v)).flatten()
-    z_earth = earth_radius * np.outer(np.ones(np.size(u)), np.cos(v)).flatten()
-    fig3d.add_trace(go.Scatter3d(x=x_earth, y=y_earth, z=z_earth, mode='lines', line=dict(color='lightblue', width=2)))
-
     st.plotly_chart(fig3d, use_container_width=True)
 
     # === FULL-WIDTH GROUND TRACK ===
     st.markdown("### Ground Track Map")
     fig_map = go.Figure(
         data=[
+            # Static Orbit
             go.Scattergeo(lon=lon, lat=lat, mode='lines', line=dict(color='red', width=4), name='Orbit'),
+            # Initial Track
             go.Scattergeo(lon=[], lat=[], mode='lines', line=dict(color='yellow', width=4), name='Track'),
-            go.Scattergeo(lon=[lon[0]], lat=[lat[0]], mode='markers', marker=dict(size=12, color='yellow'), name='CubeSat'),
-            # NASA HQ marker
-            go.Scattergeo(lon=[-77.0164], lat=[38.8833], mode='markers', marker=dict(size=15, color='red', symbol='star'), name='NASA HQ')
+            # Initial CubeSat
+            go.Scattergeo(lon=[lon[0]], lat=[lat[0]], mode='markers', marker=dict(size=12, color='yellow'), name='CubeSat')
         ],
         layout=go.Layout(
             updatemenus=[dict(
