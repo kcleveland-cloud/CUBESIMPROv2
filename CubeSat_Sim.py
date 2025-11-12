@@ -153,13 +153,16 @@ with tab1:
 
     col_wire = st.columns([1, 1, 1])
     with col_wire[0]:
-        if st.button("Play Wire Earth", key="play_wire"):
-            st.session_state.play_wire = True
-            st.rerun()
+        play_wire = st.button("Play Wire Earth", key="play_wire")
     with col_wire[1]:
-        if st.button("Pause", key="pause_wire"):
-            st.session_state.play_wire = False
-            st.rerun()
+        pause_wire = st.button("Pause", key="pause_wire")
+
+    if play_wire:
+        st.session_state.play_wire = True
+        st.rerun()
+    if pause_wire:
+        st.session_state.play_wire = False
+        st.rerun()
 
     fig_wire = go.Figure(
         data=[
@@ -191,7 +194,6 @@ with tab1:
     z_earth = earth_radius * np.outer(np.ones(np.size(u)), np.cos(v)).flatten()
     fig_wire.add_trace(go.Scatter3d(x=x_earth, y=y_earth, z=z_earth, mode='lines', line=dict(color='lightblue', width=2)))
 
-    # Add updatemenus if playing
     if st.session_state.play_wire:
         fig_wire.update_layout(
             updatemenus=[dict(
@@ -210,13 +212,16 @@ with tab1:
 
     col_flat = st.columns([1, 1, 1])
     with col_flat[0]:
-        if st.button("Play Flat Earth", key="play_flat"):
-            st.session_state.play_flat = True
-            st.rerun()
+        play_flat = st.button("Play Flat Earth", key="play_flat")
     with col_flat[1]:
-        if st.button("Pause", key="pause_flat"):
-            st.session_state.play_flat = False
-            st.rerun()
+        pause_flat = st.button("Pause", key="pause_flat")
+
+    if play_flat:
+        st.session_state.play_flat = True
+        st.rerun()
+    if pause_flat:
+        st.session_state.play_flat = False
+        st.rerun()
 
     fig_flat = go.Figure(
         data=[
@@ -255,13 +260,16 @@ with tab1:
 
     col_globe = st.columns([1, 1, 1])
     with col_globe[0]:
-        if st.button("Play Globe", key="play_globe"):
-            st.session_state.play_globe = True
-            st.rerun()
+        play_globe = st.button("Play Globe", key="play_globe")
     with col_globe[1]:
-        if st.button("Pause", key="pause_globe"):
-            st.session_state.play_globe = False
-            st.rerun()
+        pause_globe = st.button("Pause", key="pause_globe")
+
+    if play_globe:
+        st.session_state.play_globe = True
+        st.rerun()
+    if pause_globe:
+        st.session_state.play_globe = False
+        st.rerun()
 
     fig_globe = go.Figure(
         data=[
