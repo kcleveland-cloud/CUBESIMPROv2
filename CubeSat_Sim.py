@@ -72,7 +72,7 @@ class CubeSatSim:
         }
 
     def simulate_orbit_3d(self, num_points=200):
-        theta = np.linspace(0, 2 * np.pi, num_points)
+        theta = np.linspace(0, 2 * np.pi, 200)
         radius = 6371 + self.altitude_km
         inc = self.inclination
         x = radius * np.cos(theta)
@@ -115,22 +115,16 @@ with tab1:
         frames.append(go.Frame(
             name=str(i),
             data=[
-                # 3D Trail
                 go.Scatter3d(x=x_orbit[:i], y=y_orbit[:i], z=z_orbit[:i],
                              mode='lines', line=dict(color='yellow', width=4)),
-                # 3D CubeSat
                 go.Scatter3d(x=[x_orbit[i]], y=[y_orbit[i]], z=[z_orbit[i]],
                              mode='markers', marker=dict(size=12, color='yellow', symbol='diamond')),
-                # Flat Map Trail
                 go.Scattergeo(lon=lon[:i], lat=lat[:i],
                               mode='lines', line=dict(color='yellow', width=4)),
-                # Flat Map CubeSat
                 go.Scattergeo(lon=[lon[i]], lat=[lat[i]],
                               mode='markers', marker=dict(size=12, color='yellow')),
-                # Globe Trail
                 go.Scattergeo(lon=lon[:i], lat=lat[:i],
                               mode='lines', line=dict(color='yellow', width=4)),
-                # Globe CubeSat
                 go.Scattergeo(lon=[lon[i]], lat=[lat[i]],
                               mode='markers', marker=dict(size=12, color='yellow'))
             ]
@@ -139,18 +133,14 @@ with tab1:
     # === WIRE EARTH ANIMATION ===
     st.markdown("### Wire Earth Animation (CubeSat Orbit Only)")
 
-    with st.form(key="wire_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            play_wire = st.form_submit_button("Play Wire Earth")
-        with col2:
-            pause_wire = st.form_submit_button("Pause")
-
-        if play_wire:
-            st.session_state.play_wire = True
-            st.rerun()
-        if pause_wire:
+    # ONE BUTTON ONLY
+    if st.session_state.play_wire:
+        if st.button("Pause Wire Earth", key="pause_wire"):
             st.session_state.play_wire = False
+            st.rerun()
+    else:
+        if st.button("Play Wire Earth", key="play_wire"):
+            st.session_state.play_wire = True
             st.rerun()
 
     fig_wire = go.Figure(
@@ -195,18 +185,13 @@ with tab1:
     # === FLAT EARTH ANIMATION ===
     st.markdown("### Flat Earth Ground Track")
 
-    with st.form(key="flat_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            play_flat = st.form_submit_button("Play Flat Earth")
-        with col2:
-            pause_flat = st.form_submit_button("Pause")
-
-        if play_flat:
-            st.session_state.play_flat = True
-            st.rerun()
-        if pause_flat:
+    if st.session_state.play_flat:
+        if st.button("Pause Flat Earth", key="pause_flat"):
             st.session_state.play_flat = False
+            st.rerun()
+    else:
+        if st.button("Play Flat Earth", key="play_flat"):
+            st.session_state.play_flat = True
             st.rerun()
 
     fig_flat = go.Figure(
@@ -235,18 +220,13 @@ with tab1:
     # === GLOBE ANIMATION ===
     st.markdown("### Globe Ground Track")
 
-    with st.form(key="globe_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            play_globe = st.form_submit_button("Play Globe")
-        with col2:
-            pause_globe = st.form_submit_button("Pause")
-
-        if play_globe:
-            st.session_state.play_globe = True
-            st.rerun()
-        if pause_globe:
+    if st.session_state.play_globe:
+        if st.button("Pause Globe", key="pause_globe"):
             st.session_state.play_globe = False
+            st.rerun()
+    else:
+        if st.button("Play Globe", key="play_globe"):
+            st.session_state.play_globe = True
             st.rerun()
 
     fig_globe = go.Figure(
