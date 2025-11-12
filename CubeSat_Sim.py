@@ -1,4 +1,4 @@
-# app.py — Phase 1 CubeSat Sim with Pro-gated Save/Load/Export
+# app.py — CubeSat Simulator (GeneSat-validated, mission-tunable, Pro-gated I/O)
 import json
 import io
 import numpy as np
@@ -16,7 +16,7 @@ OMEGA_E = 7.2921159e-5    # Earth rotation rate (rad/s)
 SIGMA = 5.670374419e-8    # Stefan–Boltzmann (W/m^2/K^4)
 SOLAR_CONST = 1366.0      # W/m^2
 EARTH_IR = 237.0          # W/m^2
-ALBEDO = 0.3
+ALBEDO = 0.3              # dimensionless
 
 # =========================
 # Helpers
@@ -25,13 +25,17 @@ def clamp_angle_deg(a):
     return (a + 180.0) % 360.0 - 180.0
 
 def earth_view_factor(alt_m):
-    r = R_E + alt_m
-    ratio = np.clip(R_E / r, -1.0, 1.0)
-    psi = np.arccos(ratio)
-    return (1.0 - np.cos(psi)) / 2.0
+    """
+    Fraction of the sky hemisphere subtended by Earth, for altitude h.
+    Angular radius of Earth's disk: theta = arcsin(Re / r).
+    VF = (1 - cos(theta)) / 2
+    """
+    r = R_E + float(alt_m)
+    theta = np.arcsin(np.clip(R_E / r, -1.0, 1.0))
+    return (1.0 - np.cos(theta)) / 2.0
 
 def rho_msis_simple(h_m):
-    # Simple exponential atmosphere ~200–600 km band
+    # Very simple exponential atmosphere ~200–600 km band
     H = 60e3
     rho_200 = 2.5e-11
     h = np.maximum(h_m, 200e3)
@@ -47,7 +51,10 @@ def eci_to_ecef_xyz(x_eci, y_eci, z_eci, t):
     return x_ecef, y_ecef, z_ecef
 
 def eclipse_mask_from_eci(x_km, y_km, z_km):
-    """Sun along +X; eclipse when x<0 and sqrt(y^2+z^2) < R_E."""
+    """
+    Sun along +X (ECI). Eclipse when x<0 and sqrt(y^2 + z^2) < R_E.
+    Inputs in km to match plotting arrays.
+    """
     r_perp = np.sqrt(y_km**2 + z_km**2)
     return (x_km < 0) & (r_perp < (R_E/1000.0))
 
@@ -85,12 +92,15 @@ class CubeSatSim:
         self.T_orbit = 2*np.pi*np.sqrt(self.r**3/MU)   # s
         self.n = 2*np.pi/self.T_orbit                  # rad/s
         self.v = np.sqrt(MU/self.r)                    # m/s
-        self.VF = earth_view_factor(self.h)
+        self.VF = earth_view_factor(self.h)            # Earth view factor
 
     def eclipse_fraction(self):
+        """
+        Cylindrical shadow, beta ~ 0: f_ecl = (1/pi) * arcsin(Re / (Re + h))
+        Gives ~one-third of the orbit in eclipse at LEO altitudes.
+        """
         ratio = np.clip(R_E / (R_E + self.h), -1.0, 1.0)
-        psi = np.arccos(ratio)
-        return float(psi / np.pi)  # 0..0.5
+        return float(np.arcsin(ratio) / np.pi)
 
     # ---------- Orbit in ECI and synchronized timebase ----------
     def orbit_eci(self, N=720):
@@ -129,6 +139,7 @@ class CubeSatSim:
             cos_inc = nhat[:, 0]  # dot with +X
         else:
             cos_inc = np.full_like(t, 0.5)
+
         cos_inc = np.clip(cos_inc, 0.0, 1.0)
         ecl = eclipse_mask_from_eci(x_km, y_km, z_km)
         cos_inc = cos_inc * (~ecl)
@@ -140,19 +151,31 @@ class CubeSatSim:
         P, _, _ = self.instantaneous_power(attitude, t, x, y, z, A_panel, eta)
         return float(P.mean())
 
-    # ---------- Thermal ----------
-    def thermal_equilibrium(self, A_abs=None, A_rad=None):
+    # ---------- Thermal (corrected VF + internal dissipation) ----------
+    def thermal_equilibrium(self, A_abs=None, A_rad=None, Q_internal_W=0.0):
+        """
+        Radiative equilibrium (orbit-averaged):
+            Q_solar_avg + Q_albedo_avg + Q_IR + Q_internal = ε σ A_rad T^4
+        A_abs : absorbing area for solar/albedo/IR (m^2)
+        A_rad : effective radiating area (m^2)
+        Q_internal_W : electronics heat (W), e.g., average bus dissipation
+        """
         if A_abs is None:
             A_abs = self.A_panel
         if A_rad is None:
-            A_rad = 6.0*self.A_panel
+            A_rad = 6.0 * self.A_panel  # default; user should tune
+
         efrac = self.eclipse_fraction()
+        VF = self.VF  # corrected earth_view_factor
+
         Q_solar = SOLAR_CONST * self.alpha * A_abs * (1.0 - efrac)
-        Q_albedo = ALBEDO * SOLAR_CONST * self.alpha * A_abs * self.VF * (1.0 - efrac)
-        Q_ir = EARTH_IR * self.eps * A_abs * self.VF
-        Q_abs = Q_solar + Q_albedo + Q_ir
-        T_k = (Q_abs/(self.eps*SIGMA*A_rad))**0.25
-        return float(T_k - 273.15), Q_solar, Q_albedo, Q_ir, Q_abs
+        Q_albedo = ALBEDO * SOLAR_CONST * self.alpha * A_abs * VF * (1.0 - efrac)
+        # For IR, use emissivity as absorptivity (Kirchhoff)
+        Q_ir = EARTH_IR * self.eps * A_abs * VF
+        Q_total = Q_solar + Q_albedo + Q_ir + float(Q_internal_W)
+
+        T_K = (Q_total / (self.eps * SIGMA * A_rad)) ** 0.25
+        return float(T_K - 273.15), Q_solar, Q_albedo, Q_ir, float(Q_internal_W), float(Q_total)
 
     # ---------- Drag decay ----------
     def drag_decay_days(self, days, A_drag=None):
@@ -194,8 +217,7 @@ with st.sidebar:
     st.markdown(f"**Current plan:** {st.session_state.plan}")
     if st.session_state.plan == "Free":
         if st.button("Upgrade to Pro ($9/mo)"):
-            # Phase-1 stub: flip to Pro. Wire to Stripe in Phase-2.
-            st.session_state.plan = "Pro"
+            st.session_state.plan = "Pro"  # Phase-1 stub; wire to Stripe later
     else:
         st.success("Pro features unlocked ✓")
 
@@ -255,6 +277,7 @@ tab_orbit, tab_power, tab_thermal, tab_drag, tab_io = st.tabs([
 # =========================
 with tab_orbit:
     st.subheader("3D Orbit (ECI) + Aligned Ground Track (ECEF)")
+
     t, u, x_km, y_km, z_km = sim.orbit_eci(N=720)
     lon_deg, lat_deg = sim.ground_track_from_eci(t, x_km, y_km, z_km)
     eclipsed = eclipse_mask_from_eci(x_km, y_km, z_km)
@@ -370,9 +393,9 @@ with tab_power:
     P_inst, cos_inc, ecl = sim.instantaneous_power(attitude, t, x_km, y_km, z_km,
                                                    sim.A_panel, sim.eta)
     P_inst = P_inst * cal_factor
+
     P_avg = float(P_inst.mean())
     daily_gen_Wh = P_avg * 86400.0 / 3600.0
-
     cons_W = st.slider("Average consumption (W)", 0.1, 20.0, 3.0, 0.1)
     daily_cons_Wh = cons_W * 24.0
 
@@ -405,15 +428,19 @@ with tab_power:
         st.success("Battery SoC projection looks acceptable.")
 
 # =========================
-# TAB 3: THERMAL
+# TAB 3: THERMAL (corrected)
 # =========================
 with tab_thermal:
-    st.subheader("Radiative Thermal Equilibrium (averaged)")
-    A_abs = st.number_input("Absorbing face area (m²)", 0.001, 2.0, sim.A_panel, 0.001)
-    A_rad = st.number_input("Radiating area (m²)", 0.01, 6.0, 6.0*sim.A_panel, 0.01)
-    T_c, Qs, Qa, Qir, Qabs = sim.thermal_equilibrium(A_abs=A_abs, A_rad=A_rad)
+    st.subheader("Radiative Thermal Equilibrium (averaged) — corrected VF & internal heat")
+    A_abs = st.number_input("Absorbing area A_abs (m²)", 0.001, 2.0, sim.A_panel, 0.001)
+    A_rad = st.number_input("Radiating area A_rad (m²)", 0.005, 2.0, 6.0*sim.A_panel, 0.005)
+    Q_int = st.number_input("Internal dissipation Q_internal (W)", 0.0, 50.0, 0.0, 0.1)
+
+    T_c, Qs, Qa, Qir, Qin, Qtot = sim.thermal_equilibrium(A_abs=A_abs, A_rad=A_rad, Q_internal_W=Q_int)
     st.metric("Equilibrium temperature (°C)", f"{T_c:.2f}")
-    dfQ = pd.DataFrame([{"Solar_avg_W": Qs, "Albedo_W": Qa, "Earth_IR_W": Qir, "Total_abs_W": Qabs}])
+
+    dfQ = pd.DataFrame([{"Solar_avg_W": Qs, "Albedo_W": Qa, "Earth_IR_W": Qir,
+                         "Internal_W": Qin, "Total_abs_W": Qtot}])
     st.dataframe(dfQ, use_container_width=True)
     st.plotly_chart(px.bar(dfQ.melt(var_name="Component", value_name="W"),
                            x="Component", y="W", title="Absorbed power components"),
@@ -490,7 +517,7 @@ with tab_io:
 
 st.markdown("---")
 st.caption(
-    "Phase-1: public simulator with GeneSat-1 preset & optional power calibration; aligned ground track via synchronized ECI→ECEF; "
-    "attitude-dependent power; Stefan–Boltzmann thermal; simple drag decay; and **Pro-gated Save/Load/Export**. "
-    "Wire Stripe & Supabase in Phase-2."
+    "Corrected physics: cylindrical-shape eclipse fraction f = (1/π)asin(Re/(Re+h)); Earth view factor from angular radius; "
+    "separate absorbing/radiating areas + internal heat for thermal; synchronized ECI→ECEF ground track; "
+    "frames update only the sat marker so Earth persists; Save/Load/Export gated to Pro."
 )
