@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 
-# --- SAFE SESSION STATE INIT (TOP OF FILE) ---
+# --- SAFE SESSION STATE INIT ---
 if 'play_wire' not in st.session_state:
     st.session_state.play_wire = False
 if 'play_flat' not in st.session_state:
@@ -32,18 +32,6 @@ class CubeSatSim:
         r_earth = 6371e3
         h = self.altitude_m
         return (r_earth / (r_earth + h)) ** 2
-
-    def orbital_decay(self, time_days):
-        rho = 1e-12 * np.exp(-self.altitude_m / 7000)
-        decay_rate = -0.5 * rho * self.drag_coeff * self.area * self.orbital_period / self.mass
-        delta_h = decay_rate * time_days * 86400
-        return self.altitude_km + delta_h
-
-    def power_budget(self, eclipse_fraction=0.4):
-        solar_power = self.solar_constant * self.area * self.absorptivity * (1 - eclipse_fraction)
-        avg_power = solar_power * 0.9
-        consumption = 2.0
-        return avg_power, consumption
 
     def thermal_model(self):
         sigma = 5.67e-8
@@ -86,12 +74,6 @@ class CubeSatSim:
         z = radius * np.sin(theta) * np.sin(inc)
         return x, y, z
 
-    def simulate_orbit(self, num_orbits=10):
-        times = np.linspace(0, self.orbital_period * num_orbits, 1000)
-        thetas = 2 * np.pi * times / self.orbital_period
-        alt = np.full_like(times, self.altitude_m) + 100 * np.sin(thetas)
-        return times / 3600, alt / 1000
-
     def ground_track(self, num_points=200):
         theta = np.linspace(0, 2 * np.pi, num_points)
         lon = np.degrees(theta)
@@ -127,22 +109,16 @@ with tab1:
         frames.append(go.Frame(
             name=str(i),
             data=[
-                # 3D Trail
                 go.Scatter3d(x=x_orbit[:i], y=y_orbit[:i], z=z_orbit[:i],
                              mode='lines', line=dict(color='yellow', width=4)),
-                # 3D CubeSat
                 go.Scatter3d(x=[x_orbit[i]], y=[y_orbit[i]], z=[z_orbit[i]],
                              mode='markers', marker=dict(size=12, color='yellow', symbol='diamond')),
-                # Flat Map Trail
                 go.Scattergeo(lon=lon[:i], lat=lat[:i],
                               mode='lines', line=dict(color='yellow', width=4)),
-                # Flat Map CubeSat
                 go.Scattergeo(lon=[lon[i]], lat=[lat[i]],
                               mode='markers', marker=dict(size=12, color='yellow')),
-                # Globe Trail
                 go.Scattergeo(lon=lon[:i], lat=lat[:i],
                               mode='lines', line=dict(color='yellow', width=4)),
-                # Globe CubeSat
                 go.Scattergeo(lon=[lon[i]], lat=[lat[i]],
                               mode='markers', marker=dict(size=12, color='yellow'))
             ]
@@ -151,26 +127,26 @@ with tab1:
     # === WIRE EARTH ANIMATION ===
     st.markdown("### Wire Earth Animation (CubeSat Orbit Only)")
 
-    col_wire = st.columns([1, 1, 1])
-    with col_wire[0]:
-        play_wire = st.button("Play Wire Earth", key="play_wire")
-    with col_wire[1]:
-        pause_wire = st.button("Pause", key="pause_wire")
+    with st.form(key="wire_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            play_wire = st.form_submit_button("Play Wire Earth")
+        with col2:
+            pause_wire = st.form_submit_button("Pause")
 
-    # ASSIGNMENT OUTSIDE BUTTON BLOCK
-    if play_wire:
-        st.session_state.play_wire = True
-        st.rerun()
-    if pause_wire:
-        st.session_state.play_wire = False
-        st.rerun()
+        if play_wire:
+            st.session_state.play_wire = True
+            st.rerun()
+        if pause_wire:
+            st.session_state.play_wire = False
+            st.rerun()
 
     fig_wire = go.Figure(
         data=[
-            go.Scatter3d(x=x_orbit, y=y_orbit, z=z_orbit, mode='lines', line=dict(color='red', width=6), name='Orbit'),
-            go.Scatter3d(x=[], y=[], z=[], mode='lines', line=dict(color='yellow', width=4), name='Trail'),
+            go.Scatter3d(x=x_orbit, y=y_orbit, z=z_orbit, mode='lines', line=dict(color='red', width=6)),
+            go.Scatter3d(x=[], y=[], z=[], mode='lines', line=dict(color='yellow', width=4)),
             go.Scatter3d(x=[x_orbit[0]], y=[y_orbit[0]], z=[z_orbit[0]],
-                         mode='markers', marker=dict(size=12, color='yellow', symbol='diamond'), name='CubeSat')
+                         mode='markers', marker=dict(size=12, color='yellow', symbol='diamond'))
         ],
         layout=go.Layout(
             scene=dict(
@@ -180,13 +156,12 @@ with tab1:
                 aspectmode='cube',
                 camera=dict(eye=dict(x=1.8, y=1.8, z=1.2))
             ),
-            height=500,
-            margin=dict(l=0, r=0, b=0, t=0)
+            height=500
         ),
         frames=frames
     )
 
-    # Add wireframe Earth
+    # Wireframe Earth
     earth_radius = 6371
     u = np.linspace(0, 2 * np.pi, 20)
     v = np.linspace(0, np.pi, 10)
@@ -195,15 +170,11 @@ with tab1:
     z_earth = earth_radius * np.outer(np.ones(np.size(u)), np.cos(v)).flatten()
     fig_wire.add_trace(go.Scatter3d(x=x_earth, y=y_earth, z=z_earth, mode='lines', line=dict(color='lightblue', width=2)))
 
-    # Add updatemenus if playing
     if st.session_state.play_wire:
         fig_wire.update_layout(
             updatemenus=[dict(
                 type="buttons",
-                buttons=[
-                    dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])
-                ],
-                y=1.1
+                buttons=[dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])]
             )]
         )
 
@@ -212,34 +183,29 @@ with tab1:
     # === FLAT EARTH ANIMATION ===
     st.markdown("### Flat Earth Ground Track")
 
-    col_flat = st.columns([1, 1, 1])
-    with col_flat[0]:
-        play_flat = st.button("Play Flat Earth", key="play_flat")
-    with col_flat[1]:
-        pause_flat = st.button("Pause", key="pause_flat")
+    with st.form(key="flat_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            play_flat = st.form_submit_button("Play Flat Earth")
+        with col2:
+            pause_flat = st.form_submit_button("Pause")
 
-    if play_flat:
-        st.session_state.play_flat = True
-        st.rerun()
-    if pause_flat:
-        st.session_state.play_flat = False
-        st.rerun()
+        if play_flat:
+            st.session_state.play_flat = True
+            st.rerun()
+        if pause_flat:
+            st.session_state.play_flat = False
+            st.rerun()
 
     fig_flat = go.Figure(
         data=[
-            go.Scattergeo(lon=lon, lat=lat, mode='lines', line=dict(color='red', width=4), name='Orbit'),
-            go.Scattergeo(lon=[], lat=[], mode='lines', line=dict(color='yellow', width=4), name='Track'),
-            go.Scattergeo(lon=[lon[0]], lat=[lat[0]], mode='markers', marker=dict(size=12, color='yellow'), name='CubeSat')
+            go.Scattergeo(lon=lon, lat=lat, mode='lines', line=dict(color='red', width=4)),
+            go.Scattergeo(lon=[], lat=[], mode='lines', line=dict(color='yellow', width=4)),
+            go.Scattergeo(lon=[lon[0]], lat=[lat[0]], mode='markers', marker=dict(size=12, color='yellow'))
         ],
         layout=go.Layout(
-            geo=dict(
-                projection_type='natural earth',
-                showland=True, landcolor='lightgreen',
-                showocean=True, oceancolor='lightblue',
-                showcountries=True, countrycolor='gray'
-            ),
-            height=500,
-            margin=dict(l=0, r=0, b=0, t=0)
+            geo=dict(projection_type='natural earth', showland=True, landcolor='lightgreen', showocean=True, oceancolor='lightblue'),
+            height=500
         ),
         frames=frames
     )
@@ -248,10 +214,7 @@ with tab1:
         fig_flat.update_layout(
             updatemenus=[dict(
                 type="buttons",
-                buttons=[
-                    dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])
-                ],
-                y=1.1
+                buttons=[dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])]
             )]
         )
 
@@ -260,34 +223,29 @@ with tab1:
     # === GLOBE ANIMATION ===
     st.markdown("### Globe Ground Track")
 
-    col_globe = st.columns([1, 1, 1])
-    with col_globe[0]:
-        play_globe = st.button("Play Globe", key="play_globe")
-    with col_globe[1]:
-        pause_globe = st.button("Pause", key="pause_globe")
+    with st.form(key="globe_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            play_globe = st.form_submit_button("Play Globe")
+        with col2:
+            pause_globe = st.form_submit_button("Pause")
 
-    if play_globe:
-        st.session_state.play_globe = True
-        st.rerun()
-    if pause_globe:
-        st.session_state.play_globe = False
-        st.rerun()
+        if play_globe:
+            st.session_state.play_globe = True
+            st.rerun()
+        if pause_globe:
+            st.session_state.play_globe = False
+            st.rerun()
 
     fig_globe = go.Figure(
         data=[
-            go.Scattergeo(lon=lon, lat=lat, mode='lines', line=dict(color='red', width=4), name='Orbit'),
-            go.Scattergeo(lon=[], lat=[], mode='lines', line=dict(color='yellow', width=4), name='Track'),
-            go.Scattergeo(lon=[lon[0]], lat=[lat[0]], mode='markers', marker=dict(size=12, color='yellow'), name='CubeSat')
+            go.Scattergeo(lon=lon, lat=lat, mode='lines', line=dict(color='red', width=4)),
+            go.Scattergeo(lon=[], lat=[], mode='lines', line=dict(color='yellow', width=4)),
+            go.Scattergeo(lon=[lon[0]], lat=[lat[0]], mode='markers', marker=dict(size=12, color='yellow'))
         ],
         layout=go.Layout(
-            geo=dict(
-                projection_type='orthographic',
-                showland=True, landcolor='lightgreen',
-                showocean=True, oceancolor='lightblue',
-                showcountries=True, countrycolor='gray'
-            ),
-            height=500,
-            margin=dict(l=0, r=0, b=0, t=0)
+            geo=dict(projection_type='orthographic', showland=True, landcolor='lightgreen', showocean=True, oceancolor='lightblue'),
+            height=500
         ),
         frames=frames
     )
@@ -296,16 +254,13 @@ with tab1:
         fig_globe.update_layout(
             updatemenus=[dict(
                 type="buttons",
-                buttons=[
-                    dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])
-                ],
-                y=1.1
+                buttons=[dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])]
             )]
         )
 
     st.plotly_chart(fig_globe, use_container_width=True)
 
-# === TAB 2: POWER ===
+# === TAB 2 & 3 ===
 with tab2:
     st.subheader("Power Budget")
     avg_p, cons = sim.power_budget()
@@ -315,12 +270,11 @@ with tab2:
     col2.metric("Consumed", f"{cons:.2f} W")
     col3.metric("Net", f"{net:+.2f} W", delta=f"{net:+.2f} W")
 
-# === TAB 3: THERMAL ===
 with tab3:
     st.subheader("Thermal Analysis")
     thermal = sim.thermal_model()
     df = pd.DataFrame(list(thermal.items()), columns=['Case', 'Temperature (°C)'])
-    fig_bar = px.bar(df, x='Case', y='Temperature (°C)', color='Case', title="Temperature Cases")
+    fig_bar = px.bar(df, x='Case', y='Temperature (°C)', color='Case')
     st.plotly_chart(fig_bar, use_container_width=True)
 
     st.subheader("Radiation Exposure")
