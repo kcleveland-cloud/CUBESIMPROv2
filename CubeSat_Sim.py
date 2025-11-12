@@ -4,6 +4,14 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 
+# --- SAFE SESSION STATE INIT (TOP OF FILE) ---
+if 'play_wire' not in st.session_state:
+    st.session_state.play_wire = False
+if 'play_flat' not in st.session_state:
+    st.session_state.play_flat = False
+if 'play_globe' not in st.session_state:
+    st.session_state.play_globe = False
+
 class CubeSatSim:
     def __init__(self, altitude_km=400, inclination_deg=51.6):
         self.altitude_km = altitude_km
@@ -143,17 +151,15 @@ with tab1:
     # === WIRE EARTH ANIMATION ===
     st.markdown("### Wire Earth Animation (CubeSat Orbit Only)")
 
-    # SAFE INIT
-    if 'play_wire' not in st.session_state:
-        st.session_state.play_wire = False
-
     col_wire = st.columns([1, 1, 1])
     with col_wire[0]:
-        if st.button("Play Wire Earth", key="play_wire"):
+        if st.button("Play Wire Earth", key="play_wire_btn"):
             st.session_state.play_wire = True
+            st.rerun()
     with col_wire[1]:
-        if st.button("Pause", key="pause_wire"):
+        if st.button("Pause", key="pause_wire_btn"):
             st.session_state.play_wire = False
+            st.rerun()
 
     fig_wire = go.Figure(
         data=[
@@ -190,16 +196,15 @@ with tab1:
     # === FLAT EARTH ANIMATION ===
     st.markdown("### Flat Earth Ground Track")
 
-    if 'play_flat' not in st.session_state:
-        st.session_state.play_flat = False
-
     col_flat = st.columns([1, 1, 1])
     with col_flat[0]:
-        if st.button("Play Flat Earth", key="play_flat"):
+        if st.button("Play Flat Earth", key="play_flat_btn"):
             st.session_state.play_flat = True
+            st.rerun()
     with col_flat[1]:
-        if st.button("Pause", key="pause_flat"):
+        if st.button("Pause", key="pause_flat_btn"):
             st.session_state.play_flat = False
+            st.rerun()
 
     fig_flat = go.Figure(
         data=[
@@ -225,16 +230,15 @@ with tab1:
     # === GLOBE ANIMATION ===
     st.markdown("### Globe Ground Track")
 
-    if 'play_globe' not in st.session_state:
-        st.session_state.play_globe = False
-
     col_globe = st.columns([1, 1, 1])
     with col_globe[0]:
-        if st.button("Play Globe", key="play_globe"):
+        if st.button("Play Globe", key="play_globe_btn"):
             st.session_state.play_globe = True
+            st.rerun()
     with col_globe[1]:
-        if st.button("Pause", key="pause_globe"):
+        if st.button("Pause", key="pause_globe_btn"):
             st.session_state.play_globe = False
+            st.rerun()
 
     fig_globe = go.Figure(
         data=[
