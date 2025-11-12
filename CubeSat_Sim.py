@@ -1,7 +1,9 @@
-# app.py — CATSIM (CubeSat Mission Simulator)
+# CATSIM — CubeSat Mission Simulator
 # Cleveland Aerospace Technology Services — Davidsonville, MD
 # Features: β-angle power, aligned ECI→ECEF ground track, time-resolved SoC,
-# thermal with Earth view factor, drag model, Pro-gated Save/Load/Export.
+# thermal with Earth view factor, drag model, Pro-gated Save/Load/Export,
+# plus full branding (logo header, nav bar, sidebar logo, footer).
+
 import json
 import io
 import os
@@ -12,16 +14,68 @@ import plotly.graph_objects as go
 import plotly.express as px
 
 # =========================
-# Page setup & Branding
+# Page setup & global style
 # =========================
-st.set_page_config(page_title="CATSIM — CubeSat Mission Simulator", page_icon="🛰️", layout="wide")
+st.set_page_config(
+    page_title="CATSIM — CubeSat Mission Simulator",
+    page_icon="🛰️",
+    layout="wide"
+)
 
-# ---- Header with Logo + Title ----
+# ---- Brand CSS (simple) ----
+def inject_brand_css():
+    st.markdown(
+        """
+        <style>
+        /* Top nav bar */
+        .cats-nav {
+            background: #020617;
+            padding: 0.4rem 1.2rem;
+            border-radius: 12px;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 1rem;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        .cats-nav a {
+            color: #e5e7eb;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .cats-nav a:hover {
+            color: #38bdf8;
+        }
+        .cats-nav .cats-pill {
+            padding: 0.2rem 0.7rem;
+            border-radius: 999px;
+            background: #0f172a;
+            border: 1px solid #38bdf8;
+            color: #e0f2fe;
+            font-size: 0.85rem;
+        }
+        .cats-nav .cats-pill:hover {
+            background: #0369a1;
+            color: #f9fafb;
+        }
+        /* Make tables a bit nicer */
+        .dataframe th, .dataframe td {
+            font-size: 0.85rem !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+inject_brand_css()
+
+# ---- Header with Logo + Title + Nav ----
 def show_header():
     col1, col2 = st.columns([1, 3])
     with col1:
-        # Try both common paths for your logo
-        logo_paths = ["CATS_Logo.png", "assets/CATS_Logo.png", "/mnt/data/CATS Logo.png"]
+        # Look for logo in repo or assets; simplest path is "CATS_Logo.png"
+        logo_paths = ["CATS_Logo.png", "assets/CATS_Logo.png"]
         shown = False
         for p in logo_paths:
             if os.path.exists(p):
@@ -29,13 +83,30 @@ def show_header():
                 shown = True
                 break
         if not shown:
-            st.markdown("🛰️")  # fallback emoji
+            st.markdown("🛰️")  # fallback
     with col2:
-        st.markdown("""
+        st.markdown(
+            """
             # **CATSIM — CubeSat Mission Simulator**
             #### by Cleveland Aerospace Technology Services  
             *Davidsonville, Maryland, USA*
-        """)
+            """,
+            unsafe_allow_html=True,
+        )
+    # Simple nav bar
+    st.markdown(
+        """
+        <div class="cats-nav">
+            <a href="#catsim--cube-sat-mission-simulator">Home</a>
+            <a href="https://www.clevelandaerospace.com" target="_blank" rel="noopener noreferrer">Company</a>
+            <a href="mailto:press@clevelandaerospace.com">Press</a>
+            <a class="cats-pill" href="#save-load--export" >
+                🚀 Try CATSIM Pro
+            </a>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     st.markdown("---")
 
 show_header()
@@ -280,10 +351,17 @@ class CubeSatSim:
 # =========================
 # Session & Sidebar controls
 # =========================
-if "user" not in st.session_state: st.session_state.user = None
-if "plan" not in st.session_state: st.session_state.plan = "Free"
+if "user" not in st.session_state:
+    st.session_state.user = None
+if "plan" not in st.session_state:
+    st.session_state.plan = "Free"
 
 with st.sidebar:
+    # Sidebar logo (small)
+    if os.path.exists("CATS_Logo.png"):
+        st.image("CATS_Logo.png", width=90)
+    st.markdown("### CATSIM\nby CATS")
+
     st.header("Account")
     if st.session_state.user is None:
         email = st.text_input("Email")
@@ -482,9 +560,13 @@ with tab_power:
 
     # Instantaneous power plot
     st.plotly_chart(
-        px.line(x=(t_orb/t_orb[-1])*360.0, y=P_inst,
-                labels={"x":"Orbit phase (deg)", "y":"Power (W)"},
-                title=f"Instantaneous Power — {attitude} (cal {cal_factor:.2f} × derate {elec_derate:.2f} @ β={beta_deg:.1f}°)"),
+        px.line(
+            x=(t_orb / t_orb[-1]) * 360.0,
+            y=P_inst,
+            labels={"x": "Orbit phase (deg)", "y": "Power (W)"},
+            title=f"Instantaneous Power — {attitude} "
+                  f"(cal {cal_factor:.2f} × derate {elec_derate:.2f} @ β={beta_deg:.1f}°)"
+        ),
         use_container_width=True
     )
 
@@ -495,9 +577,13 @@ with tab_power:
     oap_scaled = oap * cal_factor * elec_derate
     df_beta = pd.DataFrame({"beta_deg": betas, "OAP_W": oap_scaled})
     st.plotly_chart(
-        px.line(df_beta, x="beta_deg", y="OAP_W",
-                title="Orbit-average Power vs β-angle",
-                labels={"beta_deg":"β (deg)", "OAP_W":"Orbit-average Power (W)"}),
+        px.line(
+            df_beta,
+            x="beta_deg",
+            y="OAP_W",
+            title="Orbit-average Power vs β-angle",
+            labels={"beta_deg": "β (deg)", "OAP_W": "Orbit-average Power (W)"}
+        ),
         use_container_width=True
     )
 
@@ -516,7 +602,7 @@ with tab_power:
     P_timeline = np.tile(P_inst, reps)[:total_steps]
     t_timeline = np.arange(total_steps) * dt
 
-    soc_wh = start_soc/100.0 * batt_Wh
+    soc_wh = start_soc / 100.0 * batt_Wh
     soc_series = np.empty(total_steps)
     for k in range(total_steps):
         gen = P_timeline[k]
@@ -536,7 +622,7 @@ with tab_power:
     # Downsample for plotting if very long
     max_pts = 5000
     if total_steps > max_pts:
-        idx = np.linspace(0, total_steps-1, max_pts).astype(int)
+        idx = np.linspace(0, total_steps - 1, max_pts).astype(int)
         ts_plot = t_timeline[idx] / 3600.0
         soc_plot = soc_series[idx]
     else:
@@ -544,9 +630,9 @@ with tab_power:
         soc_plot = soc_series
 
     # End-of-day SoC
-    eod_idx = (np.arange(1, mission_days+1) * int(np.floor(DAY_SEC/dt))).clip(0, total_steps-1)
+    eod_idx = (np.arange(1, mission_days + 1) * int(np.floor(DAY_SEC / dt))).clip(0, total_steps - 1)
     eod_soc = soc_series[eod_idx]
-    df_soc_daily = pd.DataFrame({"Day": np.arange(1, len(eod_idx)+1), "SoC (%)": eod_soc})
+    df_soc_daily = pd.DataFrame({"Day": np.arange(1, len(eod_idx) + 1), "SoC (%)": eod_soc})
 
     P_avg = float(P_inst.mean())
     daily_gen_Wh = P_avg * DAY_SEC / 3600.0
@@ -556,13 +642,25 @@ with tab_power:
     c2.metric("Daily generation (Wh)", f"{daily_gen_Wh:.1f}")
     c3.metric("Daily consumption (Wh)", f"{daily_cons_Wh:.1f}")
 
-    st.plotly_chart(px.line(x=ts_plot, y=soc_plot,
-                            labels={"x": "Mission time (hours)", "y":"SoC (%)"},
-                            title="Battery SoC (time-resolved)"),
-                    use_container_width=True)
-    st.plotly_chart(px.line(df_soc_daily, x="Day", y="SoC (%)", markers=True,
-                            title="Battery SoC — end of each day"),
-                    use_container_width=True)
+    st.plotly_chart(
+        px.line(
+            x=ts_plot,
+            y=soc_plot,
+            labels={"x": "Mission time (hours)", "y": "SoC (%)"},
+            title="Battery SoC (time-resolved)"
+        ),
+        use_container_width=True
+    )
+    st.plotly_chart(
+        px.line(
+            df_soc_daily,
+            x="Day",
+            y="SoC (%)",
+            markers=True,
+            title="Battery SoC — end of each day"
+        ),
+        use_container_width=True
+    )
 
     if len(eod_soc) and eod_soc[-1] < 20.0:
         st.warning("Projected final SoC < 20% — consider more panel area/efficiency, better pointing, or lower load.")
@@ -575,18 +673,29 @@ with tab_power:
 with tab_thermal:
     st.subheader("Radiative Thermal Equilibrium (averaged)")
     A_abs = st.number_input("Absorbing area A_abs (m²)", 0.001, 2.0, sim.A_panel, 0.001)
-    A_rad = st.number_input("Radiating area A_rad (m²)", 0.005, 2.0, 6.0*sim.A_panel, 0.005)
+    A_rad = st.number_input("Radiating area A_rad (m²)", 0.005, 2.0, 6.0 * sim.A_panel, 0.005)
     Q_int = st.number_input("Internal dissipation Q_internal (W)", 0.0, 50.0, 0.0, 0.1)
 
     T_c, Qs, Qa, Qir, Qin, Qtot = sim.thermal_equilibrium(A_abs=A_abs, A_rad=A_rad, Q_internal_W=Q_int)
     st.metric("Equilibrium temperature (°C)", f"{T_c:.2f}")
 
-    dfQ = pd.DataFrame([{"Solar_avg_W": Qs, "Albedo_W": Qa, "Earth_IR_W": Qir,
-                         "Internal_W": Qin, "Total_abs_W": Qtot}])
+    dfQ = pd.DataFrame([{
+        "Solar_avg_W": Qs,
+        "Albedo_W": Qa,
+        "Earth_IR_W": Qir,
+        "Internal_W": Qin,
+        "Total_abs_W": Qtot
+    }])
     st.dataframe(dfQ, use_container_width=True)
-    st.plotly_chart(px.bar(dfQ.melt(var_name="Component", value_name="W"),
-                           x="Component", y="W", title="Absorbed power components"),
-                    use_container_width=True)
+    st.plotly_chart(
+        px.bar(
+            dfQ.melt(var_name="Component", value_name="W"),
+            x="Component",
+            y="W",
+            title="Absorbed power components"
+        ),
+        use_container_width=True
+    )
 
 # =========================
 # TAB 4: DRAG
@@ -595,16 +704,24 @@ with tab_drag:
     st.subheader("Altitude Decay from Drag (simple model)")
     A_drag = st.number_input("Reference drag area (m²)", 0.001, 2.0, sim.A_panel, 0.001)
     alt_series = sim.drag_decay_days(mission_days, A_drag=A_drag)
-    df_alt = pd.DataFrame({"Day": np.arange(1, mission_days+1), "Altitude (km)": alt_series})
-    st.plotly_chart(px.line(df_alt, x="Day", y="Altitude (km)", markers=True,
-                            title="Altitude decay over mission"),
-                    use_container_width=True)
+    df_alt = pd.DataFrame({"Day": np.arange(1, mission_days + 1), "Altitude (km)": alt_series})
+    st.plotly_chart(
+        px.line(
+            df_alt,
+            x="Day",
+            y="Altitude (km)",
+            markers=True,
+            title="Altitude decay over mission"
+        ),
+        use_container_width=True
+    )
 
 # =========================
 # TAB 5: SAVE/LOAD & EXPORT (Pro-only)
 # =========================
 with tab_io:
-    st.subheader("Save / Load Missions & Export Data")
+    st.subheader("Save/Load & Export")
+    st.markdown("⬇️ **Save / Load Missions & Export Data**", help="Pro-only features for now")
     if st.session_state.plan != "Pro":
         st.info("🔒 This feature is available on the **Pro plan ($9/mo)**.")
         st.write("- Save mission parameters to JSON")
@@ -623,33 +740,54 @@ with tab_io:
         "elec_derate": elec_derate, "beta_deg": beta_deg
     }
     json_bytes = json.dumps(mission_params, indent=2).encode("utf-8")
-    st.download_button("Download Mission JSON", data=json_bytes,
-                       file_name="mission.json", mime="application/json")
+    st.download_button(
+        "Download Mission JSON",
+        data=json_bytes,
+        file_name="mission.json",
+        mime="application/json"
+    )
 
     # Export one-orbit ECI & Power
-    t_orb, u_orb, x_orb, y_orb, z_orb = sim.orbit_eci(N=720)
-    P_orb, _, _ = sim.instantaneous_power(attitude, t_orb, x_orb, y_orb, z_orb, sim.A_panel, sim.eta)
+    t_orb2, u_orb, x_orb, y_orb, z_orb = sim.orbit_eci(N=720)
+    P_orb, _, _ = sim.instantaneous_power(attitude, t_orb2, x_orb, y_orb, z_orb, sim.A_panel, sim.eta)
     P_orb = P_orb * cal_factor * elec_derate
 
     df_orbit = pd.DataFrame({
-        "t_sec": t_orb,
-        "x_eci_km": x_orb, "y_eci_km": y_orb, "z_eci_km": z_orb
+        "t_sec": t_orb2,
+        "x_eci_km": x_orb,
+        "y_eci_km": y_orb,
+        "z_eci_km": z_orb
     })
-    buf_orbit = io.StringIO(); df_orbit.to_csv(buf_orbit, index=False)
-    st.download_button("Export One-Orbit ECI CSV", buf_orbit.getvalue(), file_name="orbit_one_orbit.csv", mime="text/csv")
+    buf_orbit = io.StringIO()
+    df_orbit.to_csv(buf_orbit, index=False)
+    st.download_button(
+        "Export One-Orbit ECI CSV",
+        buf_orbit.getvalue(),
+        file_name="orbit_one_orbit.csv",
+        mime="text/csv"
+    )
 
-    df_power_orbit = pd.DataFrame({"t_sec": t_orb, "power_W": P_orb})
-    buf_porb = io.StringIO(); df_power_orbit.to_csv(buf_porb, index=False)
-    st.download_button("Export One-Orbit Power CSV", buf_porb.getvalue(), file_name="power_one_orbit.csv", mime="text/csv")
+    df_power_orbit = pd.DataFrame({"t_sec": t_orb2, "power_W": P_orb})
+    buf_porb = io.StringIO()
+    df_power_orbit.to_csv(buf_porb, index=False)
+    st.download_button(
+        "Export One-Orbit Power CSV",
+        buf_porb.getvalue(),
+        file_name="power_one_orbit.csv",
+        mime="text/csv"
+    )
 
 # =========================
 # Footer
 # =========================
-st.markdown("""
-<hr>
-<p style='text-align: center; color: gray; font-size: 0.9em;'>
-© 2025 Cleveland Aerospace Technology Services — Davidsonville, MD<br>
-<a href="mailto:press@clevelandaerospace.com">press@clevelandaerospace.com</a> •
-<a href="mailto:support@clevelandaerospace.com">support@clevelandaerospace.com</a>
-</p>
-""", unsafe_allow_html=True)
+st.markdown(
+    """
+    <hr>
+    <p style='text-align: center; color: gray; font-size: 0.9em;'>
+    © 2025 Cleveland Aerospace Technology Services — Davidsonville, MD<br>
+    <a href="mailto:press@clevelandaerospace.com">press@clevelandaerospace.com</a> •
+    <a href="mailto:support@clevelandaerospace.com">support@clevelandaerospace.com</a>
+    </p>
+    """,
+    unsafe_allow_html=True
+)
