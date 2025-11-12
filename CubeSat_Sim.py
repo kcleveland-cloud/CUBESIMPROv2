@@ -215,7 +215,7 @@ class CubeSatSim:
 # App header & subscription stub
 # =========================
 st.set_page_config(page_title="CubeSat Simulator — Phase 1", layout="wide")
-st.title("🛰️ CubeSat Simulator — Phase 1 (β-angle, time-resolved SoC, drag fixed)")
+st.title("🛰️ CubeSat Simulator — Phase 1")
 
 # Session defaults
 if "user" not in st.session_state: st.session_state.user = None
