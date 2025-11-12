@@ -69,7 +69,7 @@ class CubeSatSim:
             'Cold Face (°C)': round(T_cold, 1)
         }
 
-    def simulate_orbit_3d(self, num_points=500):  # Smoother
+    def simulate_orbit_3d(self, num_points=500):
         theta = np.linspace(0, 2 * np.pi, num_points)
         radius = 6371 + self.altitude_km
         inc = self.inclination
@@ -123,31 +123,32 @@ with tab1:
 
     # Shared frames
     frames = []
-    for i in range(0, len(x_orbit), 1):  # Smoother
+    for i in range(0, len(x_orbit), 1):
         # Fade trail
-        trail_opacity = np.linspace(0.3, 1, min(i, 50))[::-1] if i > 0 else [1]
-        trail_x = x_orbit[max(0, i-50):i]
-        trail_y = y_orbit[max(0, i-50):i]
-        trail_z = z_orbit[max(0, i-50):i]
+        trail_len = min(i, 50)
+        trail_opacity = np.linspace(0.3, 1, trail_len)[::-1] if trail_len > 0 else [1]
+        trail_x = x_orbit[max(0, i-trail_len):i]
+        trail_y = y_orbit[max(0, i-trail_len):i]
+        trail_z = z_orbit[max(0, i-trail_len):i]
 
         frames.append(go.Frame(
             name=str(i),
             data=[
                 # 3D Trail (fade)
                 go.Scatter3d(x=trail_x, y=trail_y, z=trail_z,
-                             mode='lines', line=dict(color='yellow', width=4, opacity=0.8)),
+                             mode='lines', line=dict(color='yellow', width=4), opacity=0.8),
                 # 3D CubeSat
                 go.Scatter3d(x=[x_orbit[i]], y=[y_orbit[i]], z=[z_orbit[i]],
                              mode='markers', marker=dict(size=12, color='yellow', symbol='diamond')),
                 # Ground Track Trail
-                go.Scattergeo(lon=lon[max(0, i-50):i], lat=lat[max(0, i-50):i],
+                go.Scattergeo(lon=lon[max(0, i-trail_len):i], lat=lat[max(0, i-trail_len):i],
                               mode='lines', line=dict(color='yellow', width=4)),
                 # Ground Track CubeSat
                 go.Scattergeo(lon=[lon[i]], lat=[lat[i]], mode='markers', marker=dict(size=12, color='yellow'))
             ]
         ))
 
-    # === 3D ORBIT ===
+    # === FULL-WIDTH 3D ORBIT ===
     st.markdown("### 3D Orbital Animation")
     fig3d = go.Figure(
         data=[
@@ -190,7 +191,7 @@ with tab1:
     if st.session_state.get('play', False):
         orbit_time.info(f"Orbit Time: {len(frames) * (50/anim_speed) / 60:.1f} min")
 
-    # === GROUND TRACK ===
+    # === FULL-WIDTH GROUND TRACK ===
     st.markdown("### Ground Track Map")
     fig_map = go.Figure(
         data=[
@@ -216,7 +217,7 @@ with tab1:
 
     st.plotly_chart(fig_map, use_container_width=True)
 
-# === TAB 2 & 3 ===
+# === TAB 2: POWER ===
 with tab2:
     st.subheader("Power Budget")
     avg_p, cons = sim.power_budget()
@@ -226,6 +227,7 @@ with tab2:
     col2.metric("Consumed", f"{cons:.2f} W")
     col3.metric("Net", f"{net:+.2f} W", delta=f"{net:+.2f} W")
 
+# === TAB 3: THERMAL ===
 with tab3:
     st.subheader("Thermal Analysis")
     thermal = sim.thermal_model()
