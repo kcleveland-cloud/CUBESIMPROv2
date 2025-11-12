@@ -140,25 +140,17 @@ with tab1:
             ]
         ))
 
-    # === WIRE EARTH ANIMATION (3D ONLY) ===
-    st.markdown("### Wire Earth Animation (CubeSat Orbit Only)")
-
-    # Initialize session state safely
-    if 'play_wire' not in st.session_state:
+    # === WIRE EARTH ANIMATION ===
+    st.markdown("### Wire Earth Animation")
+    if st.button("Play Wire Earth", key="play_wire"):
+        st.session_state.play_wire = True
+    if st.button("Pause", key="pause_wire"):
         st.session_state.play_wire = False
-
-    col_wire = st.columns([1, 1, 1])
-    with col_wire[0]:
-        if st.button("Play Wire Earth", key="play_wire_btn"):
-            st.session_state.play_wire = True
-    with col_wire[1]:
-        if st.button("Pause", key="pause_wire_btn"):
-            st.session_state.play_wire = False
 
     fig_wire = go.Figure(
         data=[
             # Full orbit
-            go.Scatter3d(x=x_orbit, y=y_orbit, z=z_orbit, mode='lines', line=dict(color='red', width=6), name='Orbit'),
+            go.Scatter3d(x=x_orbit, y=y_orbit, z=z_orbit, mode='lines', line=dict(color='red', width=4), name='Orbit'),
             # Initial Trail
             go.Scatter3d(x=[], y=[], z=[], mode='lines', line=dict(color='yellow', width=4), name='Trail'),
             # Initial CubeSat
@@ -188,30 +180,14 @@ with tab1:
     z_earth = earth_radius * np.outer(np.ones(np.size(u)), np.cos(v)).flatten()
     fig_wire.add_trace(go.Scatter3d(x=x_earth, y=y_earth, z=z_earth, mode='lines', line=dict(color='lightblue', width=2)))
 
-    # Trigger animation
-    if st.session_state.play_wire:
-        fig_wire.layout.updatemenus = [dict(
-            type="buttons",
-            buttons=[
-                dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])
-            ]
-        )]
-
     st.plotly_chart(fig_wire, use_container_width=True)
 
     # === FLAT EARTH ANIMATION ===
     st.markdown("### Flat Earth Ground Track")
-
-    if 'play_flat' not in st.session_state:
+    if st.button("Play Flat Earth", key="play_flat"):
+        st.session_state.play_flat = True
+    if st.button("Pause", key="pause_flat"):
         st.session_state.play_flat = False
-
-    col_flat = st.columns([1, 1, 1])
-    with col_flat[0]:
-        if st.button("Play Flat Earth", key="play_flat_btn"):
-            st.session_state.play_flat = True
-    with col_flat[1]:
-        if st.button("Pause", key="pause_flat_btn"):
-            st.session_state.play_flat = False
 
     fig_flat = go.Figure(
         data=[
@@ -232,29 +208,14 @@ with tab1:
         frames=frames
     )
 
-    if st.session_state.play_flat:
-        fig_flat.layout.updatemenus = [dict(
-            type="buttons",
-            buttons=[
-                dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])
-            ]
-        )]
-
     st.plotly_chart(fig_flat, use_container_width=True)
 
     # === GLOBE ANIMATION ===
     st.markdown("### Globe Ground Track")
-
-    if 'play_globe' not in st.session_state:
+    if st.button("Play Globe", key="play_globe"):
+        st.session_state.play_globe = True
+    if st.button("Pause", key="pause_globe"):
         st.session_state.play_globe = False
-
-    col_globe = st.columns([1, 1, 1])
-    with col_globe[0]:
-        if st.button("Play Globe", key="play_globe_btn"):
-            st.session_state.play_globe = True
-    with col_globe[1]:
-        if st.button("Pause", key="pause_globe_btn"):
-            st.session_state.play_globe = False
 
     fig_globe = go.Figure(
         data=[
@@ -274,14 +235,6 @@ with tab1:
         ),
         frames=frames
     )
-
-    if st.session_state.play_globe:
-        fig_globe.layout.updatemenus = [dict(
-            type="buttons",
-            buttons=[
-                dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])
-            ]
-        )]
 
     st.plotly_chart(fig_globe, use_container_width=True)
 
