@@ -1,4 +1,4 @@
-# app.py — CubeSat Simulator (β-angle sweep, time-resolved SoC, GeneSat-validated, Pro-gated I/O)
+# app.py — CubeSat Simulator (β-sweep, time-resolved SoC, drag fixed, GeneSat-validated, Pro-gated I/O)
 import json
 import io
 import numpy as np
@@ -31,6 +31,7 @@ def earth_view_factor(alt_m):
     return (1.0 - np.cos(theta)) / 2.0
 
 def rho_msis_simple(h_m):
+    # Very simple exponential atmosphere ~200–600 km band
     H = 60e3
     rho_200 = 2.5e-11
     h = np.maximum(h_m, 200e3)
@@ -46,15 +47,16 @@ def eci_to_ecef_xyz(x_eci, y_eci, z_eci, t):
 
 # ---- Sun vector and eclipse with β-angle ----
 def sun_vector_eci(incl_rad, beta_deg):
-    hhat = np.array([0.0, -np.sin(incl_rad), np.cos(incl_rad)])   # orbit normal (unit)
+    # Orbit normal (unit)
+    hhat = np.array([0.0, -np.sin(incl_rad), np.cos(incl_rad)])
     cb = np.cos(np.radians(beta_deg)); sb = np.sin(np.radians(beta_deg))
     S = cb * np.array([1.0, 0.0, 0.0]) + sb * hhat
     S /= np.linalg.norm(S)
     return S
 
 def eclipse_mask_from_vec(x_km, y_km, z_km, S_vec):
-    r = np.vstack((x_km, y_km, z_km)).T          # [N,3] km
-    S = np.asarray(S_vec, dtype=float)           # [3]
+    r = np.vstack((x_km, y_km, z_km)).T
+    S = np.asarray(S_vec, dtype=float)
     r_dot_S = r @ S
     r_sq = np.sum(r*r, axis=1)
     dist_ax_sq = r_sq - r_dot_S**2
@@ -191,11 +193,29 @@ class CubeSatSim:
         P = SOLAR_CONST * A_panel * eta * cos_inc
         return float(P.mean())
 
+    # ---------- Drag decay (RESTORED) ----------
+    def drag_decay_days(self, days, A_drag=None):
+        """
+        Super-simplified circular-orbit drag model integrating semi-major axis daily.
+        """
+        A = self.A_panel if A_drag is None else float(A_drag)
+        a = R_E + self.h  # current semi-major axis (m)
+        out = []
+        for _ in range(int(days)):
+            rho = rho_msis_simple(a - R_E)  # kg/m^3
+            # da/dt ≈ - (Cd * A / m) * sqrt(μ * a) * ρ
+            da_dt = - (self.Cd * A / self.m) * np.sqrt(MU * a) * rho
+            a = a + da_dt * DAY_SEC
+            if a < R_E + 120e3:
+                a = R_E + 120e3
+            out.append(a - R_E)
+        return np.array(out) / 1000.0  # km
+
 # =========================
 # App header & subscription stub
 # =========================
 st.set_page_config(page_title="CubeSat Simulator — Phase 1", layout="wide")
-st.title("🛰️ CubeSat Simulator — Phase 1 (β-angle, time-resolved SoC, mission-tunable)")
+st.title("🛰️ CubeSat Simulator — Phase 1 (β-angle, time-resolved SoC, drag fixed)")
 
 # Session defaults
 if "user" not in st.session_state: st.session_state.user = None
@@ -370,8 +390,7 @@ with tab_orbit:
 with tab_power:
     st.subheader("Power — instantaneous, average, β-sweep, and SoC (time-resolved)")
     st.caption("**Power Reality Check:** Orbit-average power (OAP) is often 30–60% of panel peak. "
-               "Benchmarks: GeneSat-1 ≈ 4–5 W OAP (3U body-mounted), typical 1U body-mounted ≈ 1–2 W OAP. "
-               "Vendor specs are peak, not orbit-average.")
+               "Benchmarks: GeneSat-1 ≈ 4–5 W OAP (3U body-mounted), typical 1U body-mounted ≈ 1–2 W OAP.")
 
     # Orbit power profile (one orbit)
     N_orbit = 720
@@ -380,7 +399,7 @@ with tab_power:
     P_inst, cos_inc, ecl = sim.instantaneous_power(attitude, t_orb, x_km, y_km, z_km, sim.A_panel, sim.eta)
     P_inst = P_inst * cal_factor * elec_derate
 
-    # Plot instantaneous power (one orbit)
+    # Instantaneous power plot
     figP = px.line(x=(t_orb/t_orb[-1])*360.0, y=P_inst,
                    labels={"x":"Orbit phase (deg)", "y":"Power (W)"},
                    title=f"Instantaneous Power — {attitude} (cal {cal_factor:.2f} × derate {elec_derate:.2f} @ β={beta_deg:.1f}°)")
@@ -407,13 +426,11 @@ with tab_power:
     limit_charge = st.checkbox("Limit charge power", False)
     P_chg_max = st.slider("Max charge power (W)", 1.0, 200.0, 30.0, 1.0) if limit_charge else None
 
-    # Build mission timeline by tiling one-orbit profile
     total_steps = int(np.ceil((mission_days * DAY_SEC) / dt))
     reps = int(np.ceil(total_steps / N_orbit))
     P_timeline = np.tile(P_inst, reps)[:total_steps]
     t_timeline = np.arange(total_steps) * dt
 
-    # Battery integration (W balance per step)
     soc_wh = start_soc/100.0 * batt_Wh
     soc_series = np.empty(total_steps)
     for k in range(total_steps):
@@ -431,22 +448,19 @@ with tab_power:
             soc_wh = max(soc_wh - dE_Wh, 0.0)
         soc_series[k] = 100.0 * soc_wh / batt_Wh
 
-    # Downsample for plotting if very long
     max_pts = 5000
     if total_steps > max_pts:
         idx = np.linspace(0, total_steps-1, max_pts).astype(int)
-        ts_plot = t_timeline[idx] / 3600.0         # hours
+        ts_plot = t_timeline[idx] / 3600.0
         soc_plot = soc_series[idx]
     else:
-        ts_plot = t_timeline / 3600.0               # hours
+        ts_plot = t_timeline / 3600.0
         soc_plot = soc_series
 
-    # Per-day summary (end-of-day SoC)
     eod_idx = (np.arange(1, mission_days+1) * int(np.floor(DAY_SEC/dt))).clip(0, total_steps-1)
     eod_soc = soc_series[eod_idx]
     df_soc_daily = pd.DataFrame({"Day": np.arange(1, len(eod_idx)+1), "SoC (%)": eod_soc})
 
-    # Metrics
     P_avg = float(P_inst.mean())
     daily_gen_Wh = P_avg * DAY_SEC / 3600.0
     daily_cons_Wh = cons_W * 24.0
@@ -455,7 +469,6 @@ with tab_power:
     c2.metric("Daily generation (Wh)", f"{daily_gen_Wh:.1f}")
     c3.metric("Daily consumption (Wh)", f"{daily_cons_Wh:.1f}")
 
-    # Plots
     st.plotly_chart(px.line(x=ts_plot, y=soc_plot,
                             labels={"x": "Mission time (hours)", "y":"SoC (%)"},
                             title="Battery SoC (time-resolved)"),
@@ -480,11 +493,11 @@ with tab_thermal:
 
     efrac = sim.eclipse_fraction()
     VF = sim.VF
-    Q_solar = SOLAR_CONST * 0.65 * A_abs * (1.0 - efrac)          # uses default α=0.65 if user didn't change above
-    Q_albedo = ALBEDO * SOLAR_CONST * 0.65 * A_abs * VF * (1.0 - efrac)
-    Q_ir = EARTH_IR * 0.83 * A_abs * VF
+    Q_solar = SOLAR_CONST * sim.alpha * A_abs * (1.0 - efrac)
+    Q_albedo = ALBEDO * SOLAR_CONST * sim.alpha * A_abs * VF * (1.0 - efrac)
+    Q_ir = EARTH_IR * sim.eps * A_abs * VF
     Q_total = Q_solar + Q_albedo + Q_ir + Q_int
-    T_K = (Q_total / (0.83 * SIGMA * A_rad)) ** 0.25
+    T_K = (Q_total / (sim.eps * SIGMA * A_rad)) ** 0.25
     T_c = float(T_K - 273.15)
 
     st.metric("Equilibrium temperature (°C)", f"{T_c:.2f}")
@@ -533,21 +546,24 @@ with tab_io:
     st.download_button("Download Mission JSON", data=json_bytes,
                        file_name="mission.json", mime="application/json")
 
-    # Export orbit & power CSVs (one orbit and time series)
+    # Export orbit & power CSVs (one orbit)
+    t_orb, u_orb, x_orb, y_orb, z_orb = sim.orbit_eci(N=720)
+    P_orb, _, _ = sim.instantaneous_power(attitude, t_orb, x_orb, y_orb, z_orb, sim.A_panel, sim.eta)
+    P_orb = P_orb * cal_factor * elec_derate
+
     df_orbit = pd.DataFrame({
         "t_sec": t_orb,
-        "x_eci_km": x_km, "y_eci_km": y_km, "z_eci_km": z_km
+        "x_eci_km": x_orb, "y_eci_km": y_orb, "z_eci_km": z_orb
     })
     buf_orbit = io.StringIO(); df_orbit.to_csv(buf_orbit, index=False)
     st.download_button("Export One-Orbit ECI CSV", buf_orbit.getvalue(), file_name="orbit_one_orbit.csv", mime="text/csv")
 
-    df_power_orbit = pd.DataFrame({"t_sec": t_orb, "power_W": P_inst})
+    df_power_orbit = pd.DataFrame({"t_sec": t_orb, "power_W": P_orb})
     buf_porb = io.StringIO(); df_power_orbit.to_csv(buf_porb, index=False)
     st.download_button("Export One-Orbit Power CSV", buf_porb.getvalue(), file_name="power_one_orbit.csv", mime="text/csv")
 
 st.markdown("---")
 st.caption(
-    "SoC now integrates at time-step resolution using the orbit power profile repeated across the mission, "
-    "with charge/discharge efficiency and optional charge power limit; β-angle support; aligned ECI→ECEF ground track; "
-    "inside-plot Play buttons; electrical derate slider; and Pro-gated Save/Load/Export."
+    "Fix: restored drag model to resolve AttributeError. Includes β-angle support, time-resolved SoC, aligned ECI→ECEF ground track, "
+    "inside-plot Play buttons, electrical derate slider, corrected thermal with user α/ε, and Pro-gated Save/Load/Export."
 )
