@@ -2,7 +2,7 @@
 # Cleveland Aerospace Technology Services — Davidsonville, MD
 # Features: β-angle power, aligned ECI→ECEF ground track, time-resolved SoC,
 # thermal with Earth view factor, drag model, Pro-gated Save/Load/Export,
-# plus full branding (logo header, nav bar, sidebar logo, footer).
+# plus full branding (logo header, nav bar, footer).
 
 import json
 import io
@@ -357,11 +357,6 @@ if "plan" not in st.session_state:
     st.session_state.plan = "Free"
 
 with st.sidebar:
-    # Sidebar logo (small)
-    if os.path.exists("CATS_Logo.png"):
-        st.image("CATS_Logo.png", width=90)
-    st.markdown("### CATSIM\nby CATS")
-
     st.header("Account")
     if st.session_state.user is None:
         email = st.text_input("Email")
