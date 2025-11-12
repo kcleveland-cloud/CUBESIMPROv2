@@ -69,7 +69,7 @@ class CubeSatSim:
             'Cold Face (°C)': round(T_cold, 1)
         }
 
-    def simulate_orbit_3d(self, num_points=200):
+    def simulate_orbit_3d(self, num_points=500):  # Smoother
         theta = np.linspace(0, 2 * np.pi, num_points)
         radius = 6371 + self.altitude_km
         inc = self.inclination
@@ -84,7 +84,7 @@ class CubeSatSim:
         alt = np.full_like(times, self.altitude_m) + 100 * np.sin(thetas)
         return times / 3600, alt / 1000
 
-    def ground_track(self, num_points=200):
+    def ground_track(self, num_points=500):
         theta = np.linspace(0, 2 * np.pi, num_points)
         lon = np.degrees(theta)
         lat = np.degrees(np.sin(self.inclination) * np.sin(theta))
@@ -107,9 +107,9 @@ sim = CubeSatSim(altitude, inclination)
 
 tab1, tab2, tab3 = st.tabs(["3D + Ground Track", "Power", "Thermal"])
 
-# === TAB 1: FULL-WIDTH, SEPARATE ANIMATIONS ===
+# === TAB 1: FULL-WIDTH ANIMATIONS ===
 with tab1:
-    # SINGLE PLAY/PAUSE BUTTON (CENTERED)
+    # SINGLE PLAY/PAUSE
     col_play = st.columns([1, 1, 1])
     with col_play[1]:
         if st.button("Play Animation", use_container_width=True):
@@ -123,36 +123,42 @@ with tab1:
 
     # Shared frames
     frames = []
-    for i in range(0, len(x_orbit), 2):
+    for i in range(0, len(x_orbit), 1):  # Smoother
+        # Fade trail
+        trail_opacity = np.linspace(0.3, 1, min(i, 50))[::-1] if i > 0 else [1]
+        trail_x = x_orbit[max(0, i-50):i]
+        trail_y = y_orbit[max(0, i-50):i]
+        trail_z = z_orbit[max(0, i-50):i]
+
         frames.append(go.Frame(
             name=str(i),
             data=[
-                # 3D Trail
-                go.Scatter3d(x=x_orbit[:i], y=y_orbit[:i], z=z_orbit[:i],
-                             mode='lines', line=dict(color='#FFD700', width=5)),
+                # 3D Trail (fade)
+                go.Scatter3d(x=trail_x, y=trail_y, z=trail_z,
+                             mode='lines', line=dict(color='yellow', width=4, opacity=0.8)),
                 # 3D CubeSat
                 go.Scatter3d(x=[x_orbit[i]], y=[y_orbit[i]], z=[z_orbit[i]],
-                             mode='markers', marker=dict(size=14, color='#FFD700', symbol='diamond')),
+                             mode='markers', marker=dict(size=12, color='yellow', symbol='diamond')),
                 # Ground Track Trail
-                go.Scattergeo(lon=lon[:i], lat=lat[:i], mode='lines', line=dict(color='#FFD700', width=5)),
+                go.Scattergeo(lon=lon[max(0, i-50):i], lat=lat[max(0, i-50):i],
+                              mode='lines', line=dict(color='yellow', width=4)),
                 # Ground Track CubeSat
-                go.Scattergeo(lon=[lon[i]], lat=[lat[i]], mode='markers', marker=dict(size=14, color='#FFD700'))
+                go.Scattergeo(lon=[lon[i]], lat=[lat[i]], mode='markers', marker=dict(size=12, color='yellow'))
             ]
         ))
 
-    # === FULL-WIDTH 3D ORBIT ===
+    # === 3D ORBIT ===
     st.markdown("### 3D Orbital Animation")
     fig3d = go.Figure(
         data=[
-            # Earth wireframe
-            go.Scatter3d(x=[], y=[], z=[], mode='lines', line=dict(color='#87CEEB', width=2), name='Earth'),
-            # Full orbit
+            go.Scatter3d(x=[], y=[], z=[], mode='lines', line=dict(color='lightblue', width=2), name='Earth'),
             go.Scatter3d(x=x_orbit, y=y_orbit, z=z_orbit, mode='lines', line=dict(color='red', width=6), name='Orbit'),
-            # Initial trail
-            go.Scatter3d(x=[], y=[], z=[], mode='lines', line=dict(color='#FFD700', width=5), name='Trail'),
-            # Initial CubeSat
+            go.Scatter3d(x=[], y=[], z=[], mode='lines', line=dict(color='yellow', width=4), name='Trail'),
             go.Scatter3d(x=[x_orbit[0]], y=[y_orbit[0]], z=[z_orbit[0]],
-                         mode='markers', marker=dict(size=14, color='#FFD700', symbol='diamond'), name='CubeSat')
+                         mode='markers', marker=dict(size=12, color='yellow', symbol='diamond'), name='CubeSat'),
+            # Sun arrow
+            go.Scatter3d(x=[0, 15000], y=[0, 0], z=[0, 0],
+                         mode='lines', line=dict(color='orange', width=8), name='Sun')
         ],
         layout=go.Layout(
             scene=dict(
@@ -163,53 +169,54 @@ with tab1:
                 camera=dict(eye=dict(x=1.8, y=1.8, z=1.2))
             ),
             height=600,
-            margin=dict(l=0, r=0, b=0, t=0),
-            paper_bgcolor='black',
-            plot_bgcolor='black'
+            margin=dict(l=0, r=0, b=0, t=0)
         ),
         frames=frames
     )
 
     # Earth wireframe
     earth_radius = 6371
-    u = np.linspace(0, 2 * np.pi, 25)
-    v = np.linspace(0, np.pi, 15)
+    u = np.linspace(0, 2 * np.pi, 20)
+    v = np.linspace(0, np.pi, 10)
     x_earth = earth_radius * np.outer(np.cos(u), np.sin(v)).flatten()
     y_earth = earth_radius * np.outer(np.sin(u), np.sin(v)).flatten()
     z_earth = earth_radius * np.outer(np.ones(np.size(u)), np.cos(v)).flatten()
-    fig3d.add_trace(go.Scatter3d(x=x_earth, y=y_earth, z=z_earth, mode='lines', line=dict(color='#87CEEB', width=2)))
+    fig3d.add_trace(go.Scatter3d(x=x_earth, y=y_earth, z=z_earth, mode='lines', line=dict(color='lightblue', width=2)))
 
     st.plotly_chart(fig3d, use_container_width=True)
 
-    # === FULL-WIDTH GROUND TRACK ===
+    # Real-time clock
+    orbit_time = st.empty()
+    if st.session_state.get('play', False):
+        orbit_time.info(f"Orbit Time: {len(frames) * (50/anim_speed) / 60:.1f} min")
+
+    # === GROUND TRACK ===
     st.markdown("### Ground Track Map")
     fig_map = go.Figure(
         data=[
-            # Full orbit
-            go.Scattergeo(lon=lon, lat=lat, mode='lines', line=dict(color='red', width=5), name='Orbit'),
-            # Initial track
-            go.Scattergeo(lon=[], lat=[], mode='lines', line=dict(color='#FFD700', width=5), name='Track'),
-            # Initial CubeSat
-            go.Scattergeo(lon=[lon[0]], lat=[lat[0]], mode='markers', marker=dict(size=14, color='#FFD700'), name='CubeSat')
+            go.Scattergeo(lon=lon, lat=lat, mode='lines', line=dict(color='red', width=4), name='Orbit'),
+            go.Scattergeo(lon=[], lat=[], mode='lines', line=dict(color='yellow', width=4), name='Track'),
+            go.Scattergeo(lon=[lon[0]], lat=[lat[0]], mode='markers', marker=dict(size=12, color='yellow'), name='CubeSat'),
+            # NASA HQ marker
+            go.Scattergeo(lon=[-77.0164], lat=[38.8833], mode='markers', marker=dict(size=15, color='red', symbol='star'), name='NASA HQ')
         ],
         layout=go.Layout(
             geo=dict(
                 projection_type='orthographic',
-                showland=True, landcolor='#228B22',
-                showocean=True, oceancolor='#191970',
+                showland=True, landcolor='lightgreen',
+                showocean=True, oceancolor='lightblue',
                 showcountries=True, countrycolor='gray',
                 lataxis=dict(range=[-90, 90]), lonaxis=dict(range=[-180, 180])
             ),
             height=600,
-            margin=dict(l=0, r=0, b=0, t=0),
-            paper_bgcolor='black'
+            margin=dict(l=0, r=0, b=0, t=0)
         ),
         frames=frames
     )
 
     st.plotly_chart(fig_map, use_container_width=True)
 
-# === TAB 2: POWER ===
+# === TAB 2 & 3 ===
 with tab2:
     st.subheader("Power Budget")
     avg_p, cons = sim.power_budget()
@@ -219,12 +226,11 @@ with tab2:
     col2.metric("Consumed", f"{cons:.2f} W")
     col3.metric("Net", f"{net:+.2f} W", delta=f"{net:+.2f} W")
 
-# === TAB 3: THERMAL ===
 with tab3:
     st.subheader("Thermal Analysis")
     thermal = sim.thermal_model()
     df = pd.DataFrame(list(thermal.items()), columns=['Case', 'Temperature (°C)'])
-    fig_bar = px.bar(df, x='Case', y='Temperature (°C)', color='Case', title="Temperature Cases", color_discrete_sequence=['#00CED1', '#FFD700', '#FF4500'])
+    fig_bar = px.bar(df, x='Case', y='Temperature (°C)', color='Case', title="Temperature Cases")
     st.plotly_chart(fig_bar, use_container_width=True)
 
     st.subheader("Radiation Exposure")
