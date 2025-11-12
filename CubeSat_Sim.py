@@ -33,6 +33,12 @@ class CubeSatSim:
         h = self.altitude_m
         return (r_earth / (r_earth + h)) ** 2
 
+    def power_budget(self, eclipse_fraction=0.4):
+        solar_power = self.solar_constant * self.area * self.absorptivity * (1 - eclipse_fraction)
+        avg_power = solar_power * 0.9
+        consumption = 2.0
+        return avg_power, consumption
+
     def thermal_model(self):
         sigma = 5.67e-8
         A_face = 0.01
@@ -109,16 +115,22 @@ with tab1:
         frames.append(go.Frame(
             name=str(i),
             data=[
+                # 3D Trail
                 go.Scatter3d(x=x_orbit[:i], y=y_orbit[:i], z=z_orbit[:i],
                              mode='lines', line=dict(color='yellow', width=4)),
+                # 3D CubeSat
                 go.Scatter3d(x=[x_orbit[i]], y=[y_orbit[i]], z=[z_orbit[i]],
                              mode='markers', marker=dict(size=12, color='yellow', symbol='diamond')),
+                # Flat Map Trail
                 go.Scattergeo(lon=lon[:i], lat=lat[:i],
                               mode='lines', line=dict(color='yellow', width=4)),
+                # Flat Map CubeSat
                 go.Scattergeo(lon=[lon[i]], lat=[lat[i]],
                               mode='markers', marker=dict(size=12, color='yellow')),
+                # Globe Trail
                 go.Scattergeo(lon=lon[:i], lat=lat[:i],
                               mode='lines', line=dict(color='yellow', width=4)),
+                # Globe CubeSat
                 go.Scattergeo(lon=[lon[i]], lat=[lat[i]],
                               mode='markers', marker=dict(size=12, color='yellow'))
             ]
@@ -260,7 +272,7 @@ with tab1:
 
     st.plotly_chart(fig_globe, use_container_width=True)
 
-# === TAB 2 & 3 ===
+# === TAB 2: POWER ===
 with tab2:
     st.subheader("Power Budget")
     avg_p, cons = sim.power_budget()
@@ -270,6 +282,7 @@ with tab2:
     col2.metric("Consumed", f"{cons:.2f} W")
     col3.metric("Net", f"{net:+.2f} W", delta=f"{net:+.2f} W")
 
+# === TAB 3: THERMAL ===
 with tab3:
     st.subheader("Thermal Analysis")
     thermal = sim.thermal_model()
