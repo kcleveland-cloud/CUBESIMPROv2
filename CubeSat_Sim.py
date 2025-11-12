@@ -69,7 +69,7 @@ class CubeSatSim:
             'Cold Face (°C)': round(T_cold, 1)
         }
 
-    def simulate_orbit_3d(self, num_points=500):
+    def simulate_orbit_3d(self, num_points=200):
         theta = np.linspace(0, 2 * np.pi, num_points)
         radius = 6371 + self.altitude_km
         inc = self.inclination
@@ -84,7 +84,7 @@ class CubeSatSim:
         alt = np.full_like(times, self.altitude_m) + 100 * np.sin(thetas)
         return times / 3600, alt / 1000
 
-    def ground_track(self, num_points=500):
+    def ground_track(self, num_points=200):
         theta = np.linspace(0, 2 * np.pi, num_points)
         lon = np.degrees(theta)
         lat = np.degrees(np.sin(self.inclination) * np.sin(theta))
@@ -123,26 +123,18 @@ with tab1:
 
     # Shared frames
     frames = []
-    for i in range(0, len(x_orbit), 1):
-        # Fade trail
-        trail_len = min(i, 50)
-        trail_opacity = np.linspace(0.3, 1, trail_len)[::-1] if trail_len > 0 else [1]
-        trail_x = x_orbit[max(0, i-trail_len):i]
-        trail_y = y_orbit[max(0, i-trail_len):i]
-        trail_z = z_orbit[max(0, i-trail_len):i]
-
+    for i in range(0, len(x_orbit), 2):
         frames.append(go.Frame(
             name=str(i),
             data=[
-                # 3D Trail (fade)
-                go.Scatter3d(x=trail_x, y=trail_y, z=trail_z,
-                             mode='lines', line=dict(color='yellow', width=4), opacity=0.8),
+                # 3D Trail
+                go.Scatter3d(x=x_orbit[:i], y=y_orbit[:i], z=z_orbit[:i],
+                             mode='lines', line=dict(color='yellow', width=4)),
                 # 3D CubeSat
                 go.Scatter3d(x=[x_orbit[i]], y=[y_orbit[i]], z=[z_orbit[i]],
                              mode='markers', marker=dict(size=12, color='yellow', symbol='diamond')),
                 # Ground Track Trail
-                go.Scattergeo(lon=lon[max(0, i-trail_len):i], lat=lat[max(0, i-trail_len):i],
-                              mode='lines', line=dict(color='yellow', width=4)),
+                go.Scattergeo(lon=lon[:i], lat=lat[:i], mode='lines', line=dict(color='yellow', width=4)),
                 # Ground Track CubeSat
                 go.Scattergeo(lon=[lon[i]], lat=[lat[i]], mode='markers', marker=dict(size=12, color='yellow'))
             ]
@@ -162,6 +154,14 @@ with tab1:
                          mode='lines', line=dict(color='orange', width=8), name='Sun')
         ],
         layout=go.Layout(
+            updatemenus=[dict(
+                type="buttons",
+                buttons=[
+                    dict(label="Play", method="animate", args=[None, dict(frame=dict(duration=50/anim_speed, redraw=True), fromcurrent=True, mode='immediate')]),
+                    dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])
+                ],
+                y=1.1
+            )],
             scene=dict(
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
@@ -170,12 +170,12 @@ with tab1:
                 camera=dict(eye=dict(x=1.8, y=1.8, z=1.2))
             ),
             height=600,
-            margin=dict(l=0, r=0, b=0, t=0)
+            margin=dict(l=0, r=0, b=0, t=40)
         ),
         frames=frames
     )
 
-    # Earth wireframe
+    # Add Earth wireframe
     earth_radius = 6371
     u = np.linspace(0, 2 * np.pi, 20)
     v = np.linspace(0, np.pi, 10)
@@ -185,11 +185,6 @@ with tab1:
     fig3d.add_trace(go.Scatter3d(x=x_earth, y=y_earth, z=z_earth, mode='lines', line=dict(color='lightblue', width=2)))
 
     st.plotly_chart(fig3d, use_container_width=True)
-
-    # Real-time clock
-    orbit_time = st.empty()
-    if st.session_state.get('play', False):
-        orbit_time.info(f"Orbit Time: {len(frames) * (50/anim_speed) / 60:.1f} min")
 
     # === FULL-WIDTH GROUND TRACK ===
     st.markdown("### Ground Track Map")
@@ -202,6 +197,14 @@ with tab1:
             go.Scattergeo(lon=[-77.0164], lat=[38.8833], mode='markers', marker=dict(size=15, color='red', symbol='star'), name='NASA HQ')
         ],
         layout=go.Layout(
+            updatemenus=[dict(
+                type="buttons",
+                buttons=[
+                    dict(label="Play", method="animate", args=[None, dict(frame=dict(duration=50/anim_speed, redraw=True), fromcurrent=True, mode='immediate')]),
+                    dict(label="Pause", method="animate", args=[[None], dict(mode="immediate")])
+                ],
+                y=1.1
+            )],
             geo=dict(
                 projection_type='orthographic',
                 showland=True, landcolor='lightgreen',
@@ -210,7 +213,7 @@ with tab1:
                 lataxis=dict(range=[-90, 90]), lonaxis=dict(range=[-180, 180])
             ),
             height=600,
-            margin=dict(l=0, r=0, b=0, t=0)
+            margin=dict(l=0, r=0, b=0, t=40)
         ),
         frames=frames
     )
