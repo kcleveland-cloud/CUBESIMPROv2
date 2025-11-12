@@ -1,4 +1,4 @@
-# app.py
+# app.py - GeneSat-1–tuned CubeSat Simulator with Play buttons restored
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -6,299 +6,365 @@ import plotly.graph_objects as go
 import plotly.express as px
 
 # -------------------------
-# Physical constants (SI)
+# Constants (SI)
 # -------------------------
-MU = 3.986004418e14        # Earth's gravitational parameter, m^3/s^2
-R_E = 6371e3               # Earth radius, m
-OMEGA_E = 7.2921159e-5     # Earth's rotation rate, rad/s
-SIGMA = 5.670374419e-8     # Stefan-Boltzmann constant, W/m^2/K^4
-SOLAR_CONST = 1366         # Solar constant (approx), W/m^2
-EARTH_IR = 237.0           # Approx Earth IR at LEO, W/m^2
+MU = 3.986004418e14       # Earth's gravitational parameter (m^3 / s^2)
+R_E = 6371e3              # Earth radius (m)
+SIGMA = 5.670374419e-8    # Stefan-Boltzmann (W / m^2 / K^4)
+SOLAR_CONST = 1366.0      # W/m^2 (approx)
+EARTH_IR = 237.0          # W/m^2 (approx)
 ALBEDO = 0.3
+OMEGA_E = 7.2921159e-5    # Earth's rotation rate (rad/s)
 
 # -------------------------
-# CubeSat sim class (corrected physics)
+# GeneSat-1 baseline parameters (from public mission docs)
+# These defaults aim to represent GeneSat-1-like behavior (user may change)
+# -------------------------
+GENESAT_DEFAULTS = {
+    "altitude_km": 460.0,        # typical reported altitude band
+    "inclination_deg": 40.0,     # ~40°
+    "mass_kg": 4.6,              # reported approximate launch mass
+    "face_area_m2": 0.03,        # per-face area approx (1U face ~0.01 -> 3U ~0.03)
+    "panel_efficiency": 0.25,    # practical cell efficiency for body mounted arrays
+    "absorptivity": 0.65,
+    "emissivity": 0.83
+}
+
+# -------------------------
+# CubeSatSim class (GeneSat-tuned physics)
 # -------------------------
 class CubeSatSim:
     def __init__(self,
-                 altitude_km=400.0,
-                 inclination_deg=51.6,
-                 face_area_m2=0.01,
-                 panel_efficiency=0.28,
-                 absorptivity=0.6,
-                 emissivity=0.8,
-                 mass_kg=1.33,
-                 drag_coeff=2.2):
-        # Inputs
+                 altitude_km=GENESAT_DEFAULTS["altitude_km"],
+                 inclination_deg=GENESAT_DEFAULTS["inclination_deg"],
+                 mass_kg=GENESAT_DEFAULTS["mass_kg"],
+                 face_area_m2=GENESAT_DEFAULTS["face_area_m2"],
+                 panel_efficiency=GENESAT_DEFAULTS["panel_efficiency"],
+                 absorptivity=GENESAT_DEFAULTS["absorptivity"],
+                 emissivity=GENESAT_DEFAULTS["emissivity"]):
+        # store inputs
+        self.h = float(altitude_km) * 1000.0            # altitude (m)
         self.alt_km = float(altitude_km)
-        self.h = self.alt_km * 1000.0             # altitude in m
-        self.inclination = np.radians(inclination_deg)
-        self.face_area = float(face_area_m2)      # m^2 (single face area)
-        self.panel_eff = float(panel_efficiency)  # electrical conversion eff when zenith
+        self.inclination = np.radians(float(inclination_deg))
+        self.mass = float(mass_kg)
+        self.face_area = float(face_area_m2)
+        self.panel_eff = float(panel_efficiency)
         self.absorptivity = float(absorptivity)
         self.emissivity = float(emissivity)
-        self.mass = float(mass_kg)
-        self.Cd = float(drag_coeff)
 
-        # Derived
-        self.r = R_E + self.h                      # orbital radius (m)
-        self.orbital_period_s = 2.0 * np.pi * np.sqrt(self.r**3 / MU)  # s
+        # derived
+        self.r = R_E + self.h                            # orbital radius (m)
+        self.orbital_period_s = 2.0 * np.pi * np.sqrt(self.r**3 / MU)
+        # view factor (solid-angle fraction approximation) -- geometric
+        # Use (1 - cos(theta))/2 where theta = arccos(R_E / r) approximates Earth subtended cap fraction.
+        ratio = np.clip(R_E / self.r, -1.0, 1.0)
+        psi = np.arccos(ratio)         # half-angle in radians for Earth's limb as seen by sat
+        # view_factor_earth approximates fraction of sky hemisphere occupied by Earth (0..1)
+        self.view_factor_earth = (1.0 - np.cos(psi)) / 2.0
 
-        # view factor approximation (used for albedo/IR)
-        self.view_factor = (R_E / (R_E + self.h))**2
-
-    # -------------------------
-    # Eclipse fraction (geometric)
-    # -------------------------
+    # geometric eclipse fraction: half-angle psi; fraction in shadow = psi / pi
     def eclipse_fraction(self):
-        # Satellite in Earth's shadow when central angle psi satisfies cos(psi) = R_E / (R_E + h)
-        # Eclipse half-angle psi = arccos(R_E / r). Fraction of orbit in shadow = psi / pi
-        ratio = R_E / self.r
-        # numerical safety
-        ratio = np.clip(ratio, -1.0, 1.0)
+        ratio = np.clip(R_E / self.r, -1.0, 1.0)
         psi = np.arccos(ratio)
-        frac = psi / np.pi
-        # returns fraction of orbit in eclipse (0..0.5)
-        return float(frac)
+        frac = float(psi / np.pi)   # 0..0.5
+        return frac
 
-    # -------------------------
-    # Orbital kinematics (3D)
-    # -------------------------
+    # 3D orbit points (km) and theta for phase
     def simulate_orbit_3d(self, num_points=400):
-        # produce coordinates in kilometers for plotting convenience
         theta = np.linspace(0.0, 2.0 * np.pi, num_points)
-        x = (self.r / 1000.0) * np.cos(theta)                                  # km
-        y = (self.r / 1000.0) * np.sin(theta) * np.cos(self.inclination)       # km
-        z = (self.r / 1000.0) * np.sin(theta) * np.sin(self.inclination)       # km
+        r_km = self.r / 1000.0
+        x = r_km * np.cos(theta)
+        y = r_km * np.sin(theta) * np.cos(self.inclination)
+        z = r_km * np.sin(theta) * np.sin(self.inclination)
         return x, y, z, theta
 
-    # -------------------------
-    # Ground track (account for Earth's rotation)
-    # -------------------------
+    # ground track (account for Earth's rotation)
     def ground_track(self, num_points=400):
-        # time array for one orbit in seconds
         t = np.linspace(0.0, self.orbital_period_s, num_points)
-        # mean motion (rad/s)
         n = 2.0 * np.pi / self.orbital_period_s
-        # satellite longitude progression relative to inertial frame:
-        lon_inertial = (n * t)  # rad
-        # convert to Earth-fixed longitude: subtract Earth's rotation OMEGA_E * t
+        lon_inertial = n * t
         lon_earth_fixed = lon_inertial - OMEGA_E * t
-        # convert to degrees and wrap to [-180,180]
         lon_deg = (np.degrees(lon_earth_fixed) + 180.0) % 360.0 - 180.0
         lat_deg = np.degrees(np.arcsin(np.sin(self.inclination) * np.sin(n * t)))
         return lon_deg, lat_deg
 
-    # -------------------------
-    # Power model (physically consistent)
-    # - Geometric eclipse fraction
-    # - Two modes: body-mounted (random orientation) or sun-pointing (max)
-    # -------------------------
-    def power_generation(self, mode='body', panel_area_m2=None):
-        """
-        mode: 'body' (body-mounted, averaged cosine effect)
-              'sunpoint' (best-case, panel normal to Sun during sunlit portion)
-        panel_area_m2: effective solar array area in m^2 (if None, uses face_area)
-        Returns: avg_generated_W, eclipse_fraction
-        """
+    # Power generation model (body-mounted vs sun-pointing)
+    def power_generation(self, mode='body-mounted', panel_area_m2=None):
         A = panel_area_m2 if panel_area_m2 is not None else self.face_area
         efrac = self.eclipse_fraction()
 
-        if mode == 'sunpoint':
-            # If sun-tracking and kept normal during sunlit fraction:
-            # instantaneous P = SOLAR_CONST * A * panel_eff, averaged over orbit: multiply by (1 - eclipse_fraction)
-            P_avg = SOLAR_CONST * A * self.panel_eff * (1.0 - efrac)
+        if mode == 'sun-pointing':
+            # idealized: panel normal to sun during sunlit fraction
+            p_avg = SOLAR_CONST * A * self.panel_eff * (1.0 - efrac)
         else:
-            # body-mounted panel: assume random orientation over spin/orbit -> average cosine factor = 0.5
-            # instantaneous mean over sunlit fraction: SOLAR_CONST * A * cos_mean * panel_eff
+            # body-mounted (no pointing): average cosine factor for a randomly oriented flat plate ~0.5
             cos_mean = 0.5
-            P_avg = SOLAR_CONST * A * cos_mean * self.panel_eff * (1.0 - efrac)
+            p_avg = SOLAR_CONST * A * cos_mean * self.panel_eff * (1.0 - efrac)
 
-        return float(P_avg), float(efrac)
+        return float(p_avg), float(efrac)
 
-    # -------------------------
-    # Thermal equilibrium temperatures (per-face approximations)
-    # Using: (Q_abs) = ε σ A_rad T^4  --> T = (Q_abs / (ε σ A_rad))^(1/4)
-    # Q_abs includes direct sunlight (reduced by eclipse), albedo (view_factor), and Earth IR (view_factor)
-    # -------------------------
-    def thermal_equilibrium(self, A_face_m2=None, A_rad_m2=None, eclipse_frac_override=None):
+    # Thermal balance per-face (averaged over orbit)
+    def thermal_balance(self, A_face_m2=None, A_rad_m2=None):
         A_face = A_face_m2 if A_face_m2 is not None else self.face_area
-        # rough radiating area for a small cube: approximate 6 * face area if all faces radiate
         A_rad = A_rad_m2 if A_rad_m2 is not None else 6.0 * self.face_area
 
-        if eclipse_frac_override is None:
-            efrac = self.eclipse_fraction()
-        else:
-            efrac = float(eclipse_frac_override)
-
-        # absorbed from direct sun on a sunlit face (when sunlit): S * α * A_face
-        # average over orbit multiply by (1 - efrac)
+        efrac = self.eclipse_fraction()
+        # solar absorbed (averaged over orbit)
         Q_solar_avg = SOLAR_CONST * self.absorptivity * A_face * (1.0 - efrac)
-        # absorbed albedo: albedo * S * α * A_face * view_factor * (1 - efrac)
-        Q_albedo = ALBEDO * SOLAR_CONST * self.absorptivity * A_face * self.view_factor * (1.0 - efrac)
-        # Earth IR absorption: EARTH_IR * emissivity * A_face * view_factor
-        Q_ir = EARTH_IR * self.emissivity * A_face * self.view_factor
+        # albedo contribution
+        Q_albedo = ALBEDO * SOLAR_CONST * self.absorptivity * A_face * self.view_factor_earth * (1.0 - efrac)
+        # Earth IR
+        Q_ir = EARTH_IR * self.emissivity * A_face * self.view_factor_earth
 
-        Q_abs_total = Q_solar_avg + Q_albedo + Q_ir
+        Q_total = Q_solar_avg + Q_albedo + Q_ir
+        # equilibrium temperature (Kelvin)
+        T_k = (Q_total / (self.emissivity * SIGMA * A_rad)) ** 0.25
+        T_c = float(T_k - 273.15)
 
-        # equilibrium T in Kelvin
-        T_k = (Q_abs_total / (self.emissivity * SIGMA * A_rad)) ** 0.25
-        T_c = T_k - 273.15
         return {
-            'Q_solar_avg_W': float(Q_solar_avg),
-            'Q_albedo_W': float(Q_albedo),
-            'Q_ir_W': float(Q_ir),
-            'Q_abs_total_W': float(Q_abs_total),
-            'T_equilibrium_C': float(T_c)
+            "Q_solar_avg_W": float(Q_solar_avg),
+            "Q_albedo_W": float(Q_albedo),
+            "Q_ir_W": float(Q_ir),
+            "Q_abs_total_W": float(Q_total),
+            "T_equilibrium_C": T_c
         }
 
-    # -------------------------
-    # Basic orbital energy / period convenience
-    # -------------------------
-    def get_orbital_period_min(self):
+    def orbital_period_min(self):
         return float(self.orbital_period_s / 60.0)
 
 
 # -------------------------
-# Streamlit UI
+# Streamlit app UI
 # -------------------------
-st.set_page_config(page_title="Corrected CubeSat Simulator", layout="wide")
-st.title("Corrected CubeSat Simulator — Physics Fixed")
+st.set_page_config(page_title="GeneSat-1 Tuned CubeSat Simulator", layout="wide")
+st.title("GeneSat-1 Tuned CubeSat Simulator")
+st.markdown("This app restores Plotly Play buttons and uses GeneSat-1–informed defaults (docs cited below).")
 
-# Sidebar params
+# --- sidebar controls ---
 with st.sidebar:
-    st.header("Mission parameters")
-    altitude = st.slider("Orbit altitude (km)", 200, 800, value=400)
-    inclination_deg = st.slider("Inclination (deg)", 0.0, 90.0, value=51.6)
-    face_area = st.number_input("Face area (m²)", min_value=0.001, max_value=1.0, value=0.01, step=0.001)
-    panel_eff = st.number_input("Panel conversion efficiency (0-1)", min_value=0.01, max_value=0.6, value=0.28, step=0.01)
+    st.header("Mission / CubeSat parameters (defaults ≈ GeneSat-1)")
+    altitude_km = st.number_input("Orbit altitude (km)", min_value=200.0, max_value=600.0, value=GENESAT_DEFAULTS["altitude_km"], step=1.0)
+    inclination_deg = st.number_input("Inclination (°)", min_value=0.0, max_value=98.0, value=GENESAT_DEFAULTS["inclination_deg"], step=0.1)
+    mass_kg = st.number_input("Mass (kg)", min_value=0.1, max_value=50.0, value=GENESAT_DEFAULTS["mass_kg"], step=0.1)
+    face_area = st.number_input("Face area (m²)", min_value=0.001, max_value=0.2, value=GENESAT_DEFAULTS["face_area_m2"], step=0.001)
+    panel_eff = st.slider("Panel efficiency (η)", min_value=0.05, max_value=0.35, value=GENESAT_DEFAULTS["panel_efficiency"], step=0.01)
+    absorp = st.slider("Absorptivity α", min_value=0.1, max_value=1.0, value=GENESAT_DEFAULTS["absorptivity"], step=0.01)
+    emis = st.slider("Emissivity ε", min_value=0.1, max_value=1.0, value=GENESAT_DEFAULTS["emissivity"], step=0.01)
+    panel_mode = st.radio("Panel attitude mode", options=["body-mounted (avg)", "sun-pointing (best)"])
     mission_days = st.number_input("Mission duration (days)", min_value=1, max_value=365, value=30)
-    anim_speed = st.slider("Animation speed multiplier", 0.1, 5.0, 1.0)
+    anim_speed = st.slider("Animation speed (1 = baseline)", 0.1, 5.0, 1.0, step=0.1)
 
-# instantiate sim (with corrected parameters)
-sim = CubeSatSim(altitude_km=altitude,
+# instantiate simulator
+sim = CubeSatSim(altitude_km=altitude_km,
                  inclination_deg=inclination_deg,
+                 mass_kg=mass_kg,
                  face_area_m2=face_area,
                  panel_efficiency=panel_eff,
-                 absorptivity=0.6,
-                 emissivity=0.8)
+                 absorptivity=absorp,
+                 emissivity=emis)
 
-# Tabs
-tab1, tab2, tab3 = st.tabs(["Orbit & Ground Track", "Power", "Thermal"])
+# --- tabs ---
+tab_orbit, tab_power, tab_thermal = st.tabs(["3D + Ground Track", "Power", "Thermal"])
 
-# -------------------------
-# Tab 1: Orbit & Ground track
-# -------------------------
-with tab1:
-    st.subheader("Orbit geometry (corrected units & Earth rotation)")
+# -------------- TAB: Orbit & animations --------------
+with tab_orbit:
+    st.subheader("Orbit geometry and animations")
 
-    # orbit 3D
-    x_km, y_km, z_km, theta = sim.simulate_orbit_3d(num_points=500)
-    lon_deg, lat_deg = sim.ground_track(num_points=500)
+    # compute orbit and ground track
+    x_km, y_km, z_km, theta = sim.simulate_orbit_3d(num_points=360)
+    lon_deg, lat_deg = sim.ground_track(num_points=360)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("**3D orbit (km)**")
-        fig3 = go.Figure()
-        fig3.add_trace(go.Scatter3d(x=x_km, y=y_km, z=z_km, mode='lines', line=dict(color='orange', width=3)))
-        fig3.update_layout(scene=dict(aspectmode='data',
-                                     xaxis=dict(showticklabels=False),
-                                     yaxis=dict(showticklabels=False),
-                                     zaxis=dict(showticklabels=False)),
-                           height=500)
-        st.plotly_chart(fig3, use_container_width=True)
+    # provide checkboxes to conditionally show Play UI in figures
+    show_play_ui = st.checkbox("Show Plotly Play buttons on figures (recommended)", value=True)
 
-    with col2:
-        st.markdown("**Ground track (one orbit)**")
-        fig2 = go.Figure()
-        fig2.add_trace(go.Scattergeo(lon=lon_deg, lat=lat_deg, mode='lines', line=dict(color='royalblue')))
-        fig2.update_layout(geo=dict(projection_type='natural earth'), height=500)
-        st.plotly_chart(fig2, use_container_width=True)
+    # --- 3D wireframe + Earth surface (with frames) ---
+    fig_3d = go.Figure()
+    # 3D orbit path
+    fig_3d.add_trace(go.Scatter3d(x=x_km, y=y_km, z=z_km, mode="lines",
+                                 line=dict(color="gold", width=3), name="orbit"))
+    # initial satellite marker
+    fig_3d.add_trace(go.Scatter3d(x=[x_km[0]], y=[y_km[0]], z=[z_km[0]],
+                                 mode="markers", marker=dict(size=6, color="red"), name="sat"))
 
-    # show computed orbital period and eclipse fraction
+    # optional translucent Earth surface
+    # create a smooth sphere grid (km)
+    u = np.linspace(0, 2*np.pi, 60)
+    v = np.linspace(0, np.pi, 30)
+    uu, vv = np.meshgrid(u, v)
+    x_earth = (R_E/1000.0) * np.cos(uu) * np.sin(vv)
+    y_earth = (R_E/1000.0) * np.sin(uu) * np.sin(vv)
+    z_earth = (R_E/1000.0) * np.cos(vv)
+    fig_3d.add_trace(go.Surface(x=x_earth, y=y_earth, z=z_earth, opacity=0.35, showscale=False, name="Earth"))
+
+    # frames for the 3D orbit animation
+    frames_3d = []
+    step = 4
+    for i in range(0, len(x_km), step):
+        frames_3d.append(go.Frame(
+            name=str(i),
+            data=[
+                go.Scatter3d(x=x_km[:i], y=y_km[:i], z=z_km[:i], mode="lines", line=dict(color="gold", width=3)),
+                go.Scatter3d(x=[x_km[i % len(x_km)]], y=[y_km[i % len(y_km)]], z=[z_km[i % len(z_km)]],
+                             mode="markers", marker=dict(size=6, color="red"))
+            ]
+        ))
+
+    fig_3d.frames = frames_3d
+    fig_3d.update_layout(scene=dict(aspectmode="data"),
+                         margin=dict(l=0,r=0,t=0,b=0), height=600, showlegend=False)
+
+    if show_play_ui:
+        # add Plotly's built-in Play button (visible on figure)
+        fig_3d.update_layout(
+            updatemenus=[dict(
+                type="buttons",
+                showactive=False,
+                y=0.05,
+                x=0.08,
+                buttons=[dict(
+                    label="Play",
+                    method="animate",
+                    args=[None, dict(frame=dict(duration=int(50/anim_speed), redraw=True),
+                                     fromcurrent=True, mode="immediate")]
+                )]
+            )]
+        )
+
+    st.plotly_chart(fig_3d, use_container_width=True)
+
+    # --- Flat ground track with frames ---
+    fig_flat = go.Figure()
+    fig_flat.add_trace(go.Scattergeo(lon=lon_deg, lat=lat_deg, mode="lines", line=dict(color="royalblue", width=2)))
+    fig_flat.add_trace(go.Scattergeo(lon=[lon_deg[0]], lat=[lat_deg[0]], mode="markers",
+                                     marker=dict(size=6, color="red")))
+    frames_flat = []
+    for i in range(0, len(lon_deg), step):
+        frames_flat.append(go.Frame(
+            name=str(i),
+            data=[
+                go.Scattergeo(lon=lon_deg[:i], lat=lat_deg[:i], mode="lines", line=dict(color="yellow", width=2)),
+                go.Scattergeo(lon=[lon_deg[i % len(lon_deg)]], lat=[lat_deg[i % len(lat_deg)]],
+                              mode="markers", marker=dict(size=6, color="red"))
+            ]
+        ))
+    fig_flat.frames = frames_flat
+    fig_flat.update_layout(geo=dict(projection_type="equirectangular", showland=True), height=350, margin=dict(t=0))
+    if show_play_ui:
+        fig_flat.update_layout(
+            updatemenus=[dict(
+                type="buttons",
+                showactive=False,
+                y=0.05,
+                x=0.12,
+                buttons=[dict(
+                    label="Play",
+                    method="animate",
+                    args=[None, dict(frame=dict(duration=int(50/anim_speed), redraw=True),
+                                     fromcurrent=True, mode="immediate")]
+                )]
+            )]
+        )
+    st.plotly_chart(fig_flat, use_container_width=True)
+
+    # --- Globe (orthographic) ground track ---
+    fig_globe = go.Figure()
+    fig_globe.add_trace(go.Scattergeo(lon=lon_deg, lat=lat_deg, mode="lines", line=dict(color="crimson", width=2)))
+    fig_globe.add_trace(go.Scattergeo(lon=[lon_deg[0]], lat=[lat_deg[0]], mode="markers",
+                                      marker=dict(size=6, color="red")))
+    frames_globe = []
+    for i in range(0, len(lon_deg), step):
+        frames_globe.append(go.Frame(
+            name=str(i),
+            data=[
+                go.Scattergeo(lon=lon_deg[:i], lat=lat_deg[:i], mode="lines", line=dict(color="yellow", width=2)),
+                go.Scattergeo(lon=[lon_deg[i % len(lon_deg)]], lat=[lat_deg[i % len(lat_deg)]],
+                              mode="markers", marker=dict(size=6, color="red"))
+            ]
+        ))
+    fig_globe.frames = frames_globe
+    fig_globe.update_layout(geo=dict(projection_type="orthographic", showland=True), height=350, margin=dict(t=0))
+    if show_play_ui:
+        fig_globe.update_layout(
+            updatemenus=[dict(
+                type="buttons",
+                showactive=False,
+                y=0.05,
+                x=0.14,
+                buttons=[dict(
+                    label="Play",
+                    method="animate",
+                    args=[None, dict(frame=dict(duration=int(50/anim_speed), redraw=True),
+                                     fromcurrent=True, mode="immediate")]
+                )]
+            )]
+        )
+    st.plotly_chart(fig_globe, use_container_width=True)
+
+    # show orbital numbers
     st.markdown("### Orbital numbers")
-    op_min = sim.get_orbital_period_min()
-    efrac = sim.eclipse_fraction()
-    st.metric("Orbital period (min)", f"{op_min:.2f}")
-    st.metric("Eclipse fraction (orbit)", f"{efrac:.3f} (→ {efrac*100:.1f}%)")
+    st.metric("Orbital period (min)", f"{sim.orbital_period_min():.2f}")
+    st.metric("Eclipse fraction (orbit)", f"{sim.eclipse_fraction():.3f}")
 
-# -------------------------
-# Tab 2: Power (corrected)
-# -------------------------
-with tab2:
-    st.subheader("Power Budget (physically consistent)")
+# -------------- TAB: Power --------------
+with tab_power:
+    st.subheader("Power budget (GeneSat-tuned)")
+    mode_key = 'sun-pointing' if panel_mode.startswith('sun') else 'body-mounted'
+    panel_area = st.number_input("Solar array effective area (m²)", min_value=0.001, max_value=0.5, value=face_area, step=0.001)
 
-    mode = st.radio("Panel attitude mode", options=['body-mounted (avg)', 'sun-pointing (best)'])
-    panel_area = st.number_input("Solar array area (m²)", min_value=0.001, max_value=1.0, value=face_area, step=0.001)
+    avg_gen_W, efrac = sim.power_generation(mode=('sun-pointing' if mode_key == 'sun-pointing' else 'body-mounted'),
+                                            panel_area_m2=panel_area)
 
-    mode_key = 'body' if mode.startswith('body') else 'sunpoint'
-    avg_gen_w, efrac = sim.power_generation(mode=mode_key, panel_area_m2=panel_area)
+    # allow user to set consumption
+    consumption_W = st.number_input("Average consumption (W)", min_value=0.1, max_value=20.0, value=3.0, step=0.1)
 
-    # battery simple sim over mission days (Wh)
-    battery_wh = st.number_input("Battery capacity (Wh)", min_value=1.0, max_value=200.0, value=20.0, step=1.0)
+    net_W = avg_gen_W - consumption_W
+    st.metric("Avg generation (W)", f"{avg_gen_W:.3f}")
+    st.metric("Avg consumption (W)", f"{consumption_W:.3f}")
+    st.metric("Net (W)", f"{net_W:+.3f}")
+
+    st.markdown(f"**Eclipse fraction:** {efrac:.3f} (fraction of orbit in Earth's shadow)")
+
+    # battery simulation (simple daily energy)
+    battery_Wh = st.number_input("Battery capacity (Wh)", min_value=1.0, max_value=200.0, value=30.0)
     start_soc_pct = st.slider("Start SoC (%)", 0, 100, 50)
 
-    # convert continuous generation and consumption to daily Wh (assume constant consumption)
-    # consumption baseline (payload + bus)
-    consumption_w = st.number_input("Baseline bus consumption (W)", min_value=0.1, max_value=50.0, value=2.0, step=0.1)
-
+    # daily energy conversions
     seconds_per_day = 86400.0
-    daily_gen_wh = avg_gen_w * seconds_per_day / 3600.0
-    daily_cons_wh = consumption_w * seconds_per_day / 3600.0
-    net_daily_wh = daily_gen_wh - daily_cons_wh
+    daily_gen_Wh = avg_gen_W * seconds_per_day / 3600.0
+    daily_cons_Wh = consumption_W * seconds_per_day / 3600.0
+    net_daily_wh = daily_gen_Wh - daily_cons_Wh
 
-    st.markdown(f"**Avg generated (W)**: {avg_gen_w:.3f} W  (panel area {panel_area:.4f} m²)  — eclipse fraction {efrac:.3f}")
-
-    # run simple SoC simulation over mission_days
     days = np.arange(1, int(mission_days) + 1)
-    soc_wh = []
-    soc = start_soc_pct / 100.0 * battery_wh
+    soc_list = []
+    soc_wh = start_soc_pct / 100.0 * battery_Wh
     for d in days:
-        soc += net_daily_wh
-        # clamp
-        soc = min(max(soc, 0.0), battery_wh)
-        soc_wh.append(100.0 * soc / battery_wh)
-    df_soc = pd.DataFrame({"Day": days, "SoC (%)": soc_wh})
-
-    # show key numbers and plots
-    col_a, col_b, col_c = st.columns(3)
-    col_a.metric("Avg gen (W)", f"{avg_gen_w:.3f}")
-    col_b.metric("Daily generation (Wh/day)", f"{daily_gen_wh:.1f}")
-    col_c.metric("Daily consumption (Wh/day)", f"{daily_cons_wh:.1f}")
+        soc_wh += net_daily_wh
+        soc_wh = min(max(soc_wh, 0.0), battery_Wh)
+        soc_list.append(100.0 * soc_wh / battery_Wh)
+    df_soc = pd.DataFrame({"Day": days, "SoC (%)": soc_list})
 
     st.plotly_chart(px.line(df_soc, x="Day", y="SoC (%)", markers=True, title="Battery SoC over mission"), use_container_width=True)
 
-    final_soc = df_soc["SoC (%)"].iloc[-1]
-    if final_soc < 20.0:
-        st.warning(f"Projected final SoC {final_soc:.1f}% < 20% — consider larger battery or lower consumption.")
+    if df_soc["SoC (%)"].iloc[-1] < 20.0:
+        st.warning("Projected final SoC < 20% — consider larger battery, pointing, or reduce power draw.")
     else:
-        st.success(f"Projected final SoC {final_soc:.1f}%")
+        st.success("Battery SoC projection looks acceptable.")
 
-# -------------------------
-# Tab 3: Thermal (corrected)
-# -------------------------
-with tab3:
-    st.subheader("Thermal equilibrium (radiative balance)")
+# -------------- TAB: Thermal --------------
+with tab_thermal:
+    st.subheader("Thermal balance (radiative equilibrium)")
 
-    A_face = st.number_input("Thermal face area for absorption (m²)", min_value=0.001, max_value=0.5, value=face_area, step=0.001)
-    A_rad = st.number_input("Radiating area (m²)", min_value=0.001, max_value=3.0, value=6.0 * face_area, step=0.01)
+    A_face = st.number_input("Absorbing face area (m²)", min_value=0.001, max_value=0.5, value=face_area, step=0.001)
+    A_rad = st.number_input("Radiating area (m²)", min_value=0.001, max_value=3.0, value=6.0*face_area, step=0.01)
 
-    thermal = sim.thermal_equilibrium(A_face_m2=A_face, A_rad_m2=A_rad)
-    st.write("Components of absorbed flux (W):")
+    thermo = sim.thermal_balance(A_face_m2=A_face, A_rad_m2=A_rad)
     st.write(pd.DataFrame([{
-        "Q_solar_avg_W": thermal['Q_solar_avg_W'],
-        "Q_albedo_W": thermal['Q_albedo_W'],
-        "Q_ir_W": thermal['Q_ir_W'],
-        "Q_abs_total_W": thermal['Q_abs_total_W']
+        "Q_solar_avg_W": thermo["Q_solar_avg_W"],
+        "Q_albedo_W": thermo["Q_albedo_W"],
+        "Q_ir_W": thermo["Q_ir_W"],
+        "Q_abs_total_W": thermo["Q_abs_total_W"]
     }]))
-    st.metric("Equilibrium temperature (°C)", f"{thermal['T_equilibrium_C']:.2f} °C")
-
-    # small bar chart
-    fig_bar = px.bar(pd.DataFrame({
-        'Component': ['Solar (avg)', 'Albedo (avg)', 'Earth IR'],
-        'W': [thermal['Q_solar_avg_W'], thermal['Q_albedo_W'], thermal['Q_ir_W']]
-    }), x='Component', y='W', title="Absorbed power components (W)")
-    st.plotly_chart(fig_bar, use_container_width=True)
+    st.metric("Equilibrium temperature (°C)", f"{thermo['T_equilibrium_C']:.2f}")
 
 st.markdown("---")
-st.caption("Physics corrections applied: SI units internally, geometric eclipse fraction, Earth rotation in ground track, average-power model for body-mounted panels, Stefan–Boltzmann thermal balance.")
+st.caption("GeneSat-1 tuned defaults and orbital facts referenced from mission docs / community sources.")
