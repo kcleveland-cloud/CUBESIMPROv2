@@ -157,6 +157,7 @@ with tab1:
     with col_wire[1]:
         pause_wire = st.button("Pause", key="pause_wire")
 
+    # ASSIGNMENT OUTSIDE BUTTON BLOCK
     if play_wire:
         st.session_state.play_wire = True
         st.rerun()
@@ -194,6 +195,7 @@ with tab1:
     z_earth = earth_radius * np.outer(np.ones(np.size(u)), np.cos(v)).flatten()
     fig_wire.add_trace(go.Scatter3d(x=x_earth, y=y_earth, z=z_earth, mode='lines', line=dict(color='lightblue', width=2)))
 
+    # Add updatemenus if playing
     if st.session_state.play_wire:
         fig_wire.update_layout(
             updatemenus=[dict(
