@@ -1,4 +1,4 @@
-# app.py — Phase 1 Launch-Ready Generic CubeSat Sim (GeneSat-validated, user-tunable)
+# app.py — Phase 1 CubeSat Sim with Pro-gated Save/Load/Export
 import json
 import io
 import numpy as np
@@ -31,7 +31,7 @@ def earth_view_factor(alt_m):
     return (1.0 - np.cos(psi)) / 2.0
 
 def rho_msis_simple(h_m):
-    # VERY simple exponential atmosphere ~ 200–600 km band
+    # Simple exponential atmosphere ~200–600 km band
     H = 60e3
     rho_200 = 2.5e-11
     h = np.maximum(h_m, 200e3)
@@ -96,7 +96,7 @@ class CubeSatSim:
     def orbit_eci(self, N=720):
         """Return time array (s) for one orbit and ECI position vectors in km."""
         t = np.linspace(0.0, self.T_orbit, N, endpoint=False)
-        u = self.n * t  # argument of latitude for circular orbit
+        u = self.n * t  # argument of latitude (circular orbit)
         r_km = self.r / 1000.0
         x = r_km * np.cos(u)
         y = r_km * np.sin(u) * np.cos(self.i)
@@ -104,16 +104,13 @@ class CubeSatSim:
         return t, u, x, y, z
 
     def ground_track_from_eci(self, t, x_eci_km, y_eci_km, z_eci_km):
-        """Exact ground track from the SAME timebase using ECI->ECEF rotation."""
-        # convert km->m for rotation math, then back
+        """Exact ground track from SAME timebase using ECI->ECEF rotation."""
         x_m = x_eci_km * 1000.0
         y_m = y_eci_km * 1000.0
         z_m = z_eci_km * 1000.0
         x_ecef, y_ecef, z_ecef = eci_to_ecef_xyz(x_m, y_m, z_m, t)
-        # lon/lat
         lon = np.degrees(np.arctan2(y_ecef, x_ecef))
         lat = np.degrees(np.arcsin(z_ecef / np.sqrt(x_ecef**2 + y_ecef**2 + z_ecef**2)))
-        # wrap longitude to [-180, 180]
         lon = clamp_angle_deg(lon)
         return lon, lat
 
@@ -123,18 +120,15 @@ class CubeSatSim:
         if attitude == "body-spin":
             cos_inc = np.full_like(t, 0.5)
         elif attitude == "sun-tracking":
-            # panel normal fixed to +X (sun)
             nx = np.ones_like(t); ny = np.zeros_like(t); nz = np.zeros_like(t)
             cos_inc = nx  # dot with +X
         elif attitude == "nadir-pointing":
-            # panel points -r_hat (toward Earth)
             rv = np.vstack((x_km, y_km, z_km)).T
             rnorm = np.linalg.norm(rv, axis=1, keepdims=True)
             nhat = -(rv / np.maximum(rnorm, 1e-12))
             cos_inc = nhat[:, 0]  # dot with +X
         else:
             cos_inc = np.full_like(t, 0.5)
-
         cos_inc = np.clip(cos_inc, 0.0, 1.0)
         ecl = eclipse_mask_from_eci(x_km, y_km, z_km)
         cos_inc = cos_inc * (~ecl)
@@ -152,7 +146,6 @@ class CubeSatSim:
             A_abs = self.A_panel
         if A_rad is None:
             A_rad = 6.0*self.A_panel
-
         efrac = self.eclipse_fraction()
         Q_solar = SOLAR_CONST * self.alpha * A_abs * (1.0 - efrac)
         Q_albedo = ALBEDO * SOLAR_CONST * self.alpha * A_abs * self.VF * (1.0 - efrac)
@@ -176,15 +169,17 @@ class CubeSatSim:
         return np.array(out) / 1000.0  # km
 
 # =========================
-# UI: Header & Auth stub
+# App header & subscription stub
 # =========================
 st.set_page_config(page_title="CubeSat Simulator — Phase 1", layout="wide")
 st.title("🛰️ CubeSat Simulator — Phase 1 (GeneSat-validated, mission-tunable)")
 
+# Session defaults
+if "user" not in st.session_state: st.session_state.user = None
+if "plan" not in st.session_state: st.session_state.plan = "Free"
+
 with st.sidebar:
     st.header("Sign in (stub)")
-    if "user" not in st.session_state:
-        st.session_state.user = None
     if st.session_state.user is None:
         email = st.text_input("Email")
         if st.button("Sign in"):
@@ -193,6 +188,16 @@ with st.sidebar:
         st.success(f"Signed in as {st.session_state.user}")
         if st.button("Sign out"):
             st.session_state.user = None
+            st.session_state.plan = "Free"
+
+    st.header("Plan")
+    st.markdown(f"**Current plan:** {st.session_state.plan}")
+    if st.session_state.plan == "Free":
+        if st.button("Upgrade to Pro ($9/mo)"):
+            # Phase-1 stub: flip to Pro. Wire to Stripe in Phase-2.
+            st.session_state.plan = "Pro"
+    else:
+        st.success("Pro features unlocked ✓")
 
     st.header("Preset & Validation")
     use_genesat = st.checkbox("Load GeneSat-1 defaults", True)
@@ -226,21 +231,12 @@ with st.sidebar:
     anim_speed = st.slider("Animation speed (Plotly)", 0.1, 5.0, 1.0, 0.1)
     mission_days = st.slider("Mission duration (days)", 1, 365, 60)
 
-    st.header("Pricing (Phase 1)")
-    with st.expander("Free vs Pro (stub)"):
-        st.markdown("- **Free:** core sim (3D, ground track, power, thermal)")
-        st.markdown("- **Pro ($9/mo):** CSV export, API access (coming soon)")
-        st.button("Upgrade to Pro (placeholder)")
-
-# =========================
-# Build sim + optional power calibration
-# =========================
+# Build simulator & optional power calibration
 sim = CubeSatSim(
     altitude_km=altitude_km, incl_deg=incl_deg, mass_kg=mass_kg,
     Cd=Cd, panel_area_m2=panel_area, panel_eff=panel_eff,
     absorptivity=absorp, emissivity=emiss
 )
-
 cal_factor = 1.0
 if auto_cal:
     P_now = sim.avg_power(attitude, sim.A_panel, sim.eta)
@@ -259,9 +255,7 @@ tab_orbit, tab_power, tab_thermal, tab_drag, tab_io = st.tabs([
 # =========================
 with tab_orbit:
     st.subheader("3D Orbit (ECI) + Aligned Ground Track (ECEF)")
-    # ECI + timebase
     t, u, x_km, y_km, z_km = sim.orbit_eci(N=720)
-    # ground track from SAME timebase via ECEF rotation
     lon_deg, lat_deg = sim.ground_track_from_eci(t, x_km, y_km, z_km)
     eclipsed = eclipse_mask_from_eci(x_km, y_km, z_km)
 
@@ -292,7 +286,7 @@ with tab_orbit:
                                  mode="markers", marker=dict(size=6, color="red"),
                                  name="Sat"))
 
-    # Frames that ONLY update trace 3 so Earth/lines persist
+    # Frames update only trace 3 so Earth/lines persist
     frames3d = []
     step = 4
     for k in range(0, len(x_km), step):
@@ -328,12 +322,10 @@ with tab_orbit:
 
     # Ground track figure with synchronized marker
     fig_gt = go.Figure()
-    # trace 0: full path (static)
     fig_gt.add_trace(go.Scattergeo(lon=lon_deg, lat=lat_deg, mode="lines",
-                                   line=dict(color="royalblue", width=2), name="Path"))
-    # trace 1: animated marker synchronized to 3D index
+                                   line=dict(color="royalblue", width=2), name="Path"))  # trace 0
     fig_gt.add_trace(go.Scattergeo(lon=[lon_deg[0]], lat=[lat_deg[0]], mode="markers",
-                                   marker=dict(size=6, color="red"), name="Sat"))
+                                   marker=dict(size=6, color="red"), name="Sat"))        # trace 1
     frames_gt = []
     for k in range(0, len(lon_deg), step):
         frames_gt.append(go.Frame(
@@ -378,9 +370,9 @@ with tab_power:
     P_inst, cos_inc, ecl = sim.instantaneous_power(attitude, t, x_km, y_km, z_km,
                                                    sim.A_panel, sim.eta)
     P_inst = P_inst * cal_factor
-
     P_avg = float(P_inst.mean())
     daily_gen_Wh = P_avg * 86400.0 / 3600.0
+
     cons_W = st.slider("Average consumption (W)", 0.1, 20.0, 3.0, 0.1)
     daily_cons_Wh = cons_W * 24.0
 
@@ -440,10 +432,18 @@ with tab_drag:
                     use_container_width=True)
 
 # =========================
-# TAB 5: SAVE/LOAD & EXPORT
+# TAB 5: SAVE/LOAD & EXPORT (Pro-only)
 # =========================
 with tab_io:
     st.subheader("Save / Load Missions & Export Data")
+    if st.session_state.plan != "Pro":
+        st.info("🔒 This feature is available on the **Pro plan ($9/mo)**.")
+        st.write("- Save mission parameters to JSON")
+        st.write("- Load mission JSON")
+        st.write("- Export Orbit CSV and Power CSV")
+        st.write("")
+        st.write("Upgrade in the sidebar to unlock.")
+        st.stop()
 
     # ---- Save parameters to JSON (download) ----
     mission_params = {
@@ -491,6 +491,6 @@ with tab_io:
 st.markdown("---")
 st.caption(
     "Phase-1: public simulator with GeneSat-1 preset & optional power calibration; aligned ground track via synchronized ECI→ECEF; "
-    "attitude-dependent power; Stefan–Boltzmann thermal; simple drag decay; mission save/load and CSV export. "
-    "Hook Stripe & Supabase in Phase-2."
+    "attitude-dependent power; Stefan–Boltzmann thermal; simple drag decay; and **Pro-gated Save/Load/Export**. "
+    "Wire Stripe & Supabase in Phase-2."
 )
