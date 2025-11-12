@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 
-# --- SAFE SESSION STATE INIT ---
+# --- SAFE SESSION STATE INIT (TOP OF FILE) ---
 if 'play_wire' not in st.session_state:
     st.session_state.play_wire = False
 if 'play_flat' not in st.session_state:
@@ -72,7 +72,7 @@ class CubeSatSim:
         }
 
     def simulate_orbit_3d(self, num_points=200):
-        theta = np.linspace(0, 2 * np.pi, 200)
+        theta = np.linspace(0, 2 * np.pi, num_points)
         radius = 6371 + self.altitude_km
         inc = self.inclination
         x = radius * np.cos(theta)
@@ -133,13 +133,13 @@ with tab1:
     # === WIRE EARTH ANIMATION ===
     st.markdown("### Wire Earth Animation (CubeSat Orbit Only)")
 
-    # ONE BUTTON ONLY
+    # ONE BUTTON LOGIC
     if st.session_state.play_wire:
-        if st.button("Pause Wire Earth", key="pause_wire"):
+        if st.button("Pause Wire Earth"):
             st.session_state.play_wire = False
             st.rerun()
     else:
-        if st.button("Play Wire Earth", key="play_wire"):
+        if st.button("Play Wire Earth"):
             st.session_state.play_wire = True
             st.rerun()
 
@@ -186,11 +186,11 @@ with tab1:
     st.markdown("### Flat Earth Ground Track")
 
     if st.session_state.play_flat:
-        if st.button("Pause Flat Earth", key="pause_flat"):
+        if st.button("Pause Flat Earth"):
             st.session_state.play_flat = False
             st.rerun()
     else:
-        if st.button("Play Flat Earth", key="play_flat"):
+        if st.button("Play Flat Earth"):
             st.session_state.play_flat = True
             st.rerun()
 
@@ -221,11 +221,11 @@ with tab1:
     st.markdown("### Globe Ground Track")
 
     if st.session_state.play_globe:
-        if st.button("Pause Globe", key="pause_globe"):
+        if st.button("Pause Globe"):
             st.session_state.play_globe = False
             st.rerun()
     else:
-        if st.button("Play Globe", key="play_globe"):
+        if st.button("Play Globe"):
             st.session_state.play_globe = True
             st.rerun()
 
