@@ -13,7 +13,7 @@ import plotly.express as px
 MU = 3.986004418e14       # Earth's gravitational parameter (m^3/s^2)
 R_E = 6371e3              # Earth radius (m)
 OMEGA_E = 7.2921159e-5    # Earth rotation rate (rad/s)
-SIGMA = 5.670374419e-8    # Stefan–Boltzmann (W/m^4/K^4)
+SIGMA = 5.670374419e-8    # Stefan–Boltzmann (W/m^2/K^4)
 SOLAR_CONST = 1366.0      # W/m^2
 EARTH_IR = 237.0          # W/m^2
 ALBEDO = 0.3              # dimensionless
@@ -81,9 +81,8 @@ def eclipse_mask_from_vec(x_km, y_km, z_km, S_vec):
 def eclipse_fraction_beta(alt_m, beta_deg):
     """
     Orbit-averaged eclipse fraction for circular orbit, cylindrical shadow with β.
-    f = (1/π) * arccos( sqrt(1 - (Re/r)^2) / cos β ),    if |β| < βcrit
+    f = (1/π) * arccos( sqrt(1 - (Re/r)^2) / cos β ),    if cosβ>0 and value<1
       = 0,                                               otherwise
-    where βcrit = arccos( sqrt(1 - (Re/r)^2) ).
     Reduces to f = (1/π) * asin(Re/r) at β = 0.
     """
     r = R_E + float(alt_m)
@@ -280,7 +279,7 @@ with st.sidebar:
         st.success(f"Signed in as {st.session_state.user}")
         if st.button("Sign out"):
             st.session_state.user = None
-            st.session_state.plan = "Free")
+            st.session_state.plan = "Free"   # <-- fixed (removed stray ')')
 
     st.header("Plan")
     st.markdown(f"**Current plan:** {st.session_state.plan}")
