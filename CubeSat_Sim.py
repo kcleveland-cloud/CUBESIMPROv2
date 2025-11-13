@@ -76,6 +76,20 @@ def inject_brand_css():
             border-color: #1e40af !important;
             color: #ffffff !important;
         }
+        /* --- Make the Standard (non-primary) plan button white --- */
+div[data-testid="stSidebar"] .stButton > button:not([kind="primary"]) {
+    background-color: #ffffff !important;
+    color: #1d4ed8 !important;             /* blue text */
+    border: 1px solid #1d4ed8 !important;  /* blue border */
+}
+
+/* Hover state */
+div[data-testid="stSidebar"] .stButton > button:not([kind="primary"]):hover {
+    background-color: #ebf2ff !important;  /* light blue on hover */
+    color: #1d4ed8 !important;
+    border-color: #1d4ed8 !important;
+}
+
         </style>
         """,
         unsafe_allow_html=True
