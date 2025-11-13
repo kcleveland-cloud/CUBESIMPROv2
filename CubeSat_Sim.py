@@ -24,6 +24,7 @@ st.set_page_config(
     layout="wide"
 )
 
+# ---- Brand CSS (simple) ----
 def inject_brand_css():
     st.markdown(
         """
@@ -81,7 +82,6 @@ def inject_brand_css():
         """,
         unsafe_allow_html=True
     )
-
 
 inject_brand_css()
 
@@ -439,7 +439,7 @@ with st.sidebar:
                 st.session_state.plan_base = "standard"
                 st.experimental_rerun()
 
-        # Pro button – primary (now overridden to blue via CSS)
+        # Pro button – primary (blue via CSS)
         with col_b:
             if st.button("🚀 Go Pro $9.99/mo", type="primary"):
                 st.session_state.plan_base = "pro"
