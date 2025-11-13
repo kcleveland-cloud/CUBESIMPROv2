@@ -55,28 +55,22 @@ def inject_brand_css():
             font-size: 0.85rem !important;
         }
 
-        /* 🔵 Force primary buttons in the SIDEBAR to be blue via theme variables */
-        div[data-testid="stSidebar"] {
-            --button-primary-background-color: #1d4ed8 !important;           /* blue-700 */
-            --button-primary-border-color: #1d4ed8 !important;
-            --button-primary-text-color: #ffffff !important;
-            --button-primary-hover-background-color: #1e40af !important;     /* blue-800 */
-            --button-primary-hover-border-color: #1e40af !important;
-            --button-primary-focus-ring-color: #1d4ed866 !important;
+        /* 🔵 Force ALL primary buttons in the SIDEBAR to be blue */
+        div[data-testid="stSidebar"] .stButton > button,
+        div[data-testid="stSidebar"] button[kind="primary"],
+        div[data-testid="stSidebar"] button[data-testid="baseButton-primary"] {
+            background-color: #1d4ed8 !important;   /* blue-700 */
+            border: 1px solid #1d4ed8 !important;
+            color: #ffffff !important;
         }
 
-        /* Extra safety: directly style primary buttons in sidebar */
-        div[data-testid="stSidebar"] .stButton button[data-testid="baseButton-primary"],
-        div[data-testid="stSidebar"] .stButton > button[kind="primary"] {
-            background-color: var(--button-primary-background-color) !important;
-            color: var(--button-primary-text-color) !important;
-            border-color: var(--button-primary-border-color) !important;
-        }
-        div[data-testid="stSidebar"] .stButton button[data-testid="baseButton-primary"]:hover,
-        div[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
-            background-color: var(--button-primary-hover-background-color) !important;
-            border-color: var(--button-primary-hover-border-color) !important;
-            color: var(--button-primary-text-color) !important;
+        /* Hover state for sidebar buttons */
+        div[data-testid="stSidebar"] .stButton > button:hover,
+        div[data-testid="stSidebar"] button[kind="primary"]:hover,
+        div[data-testid="stSidebar"] button[data-testid="baseButton-primary"]:hover {
+            background-color: #1e40af !important;   /* blue-800 */
+            border-color: #1e40af !important;
+            color: #ffffff !important;
         }
         </style>
         """,
@@ -439,7 +433,7 @@ with st.sidebar:
                 st.session_state.plan_base = "standard"
                 st.rerun()
 
-        # Pro button – primary (blue via CSS)
+        # Pro button – primary (will now be blue via CSS)
         with col_b:
             if st.button("🚀 Go Pro $9.99/mo", type="primary"):
                 st.session_state.plan_base = "pro"
