@@ -24,7 +24,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# ---- Brand CSS (simple) ----
 def inject_brand_css():
     st.markdown(
         """
@@ -55,13 +54,18 @@ def inject_brand_css():
             font-size: 0.85rem !important;
         }
 
-        /* Sidebar primary button (Go Pro) in blue */
-        div[data-testid="stSidebar"] .stButton > button[kind="primary"] {
+        /* Sidebar primary button (Go Pro) in blue.
+           Newer Streamlit uses data-testid="baseButton-primary" */
+        div[data-testid="stSidebar"] .stButton button[data-testid="baseButton-primary"],
+        div[data-testid="stSidebar"] .stButton > button[kind="primary"],
+        div[data-testid="stSidebar"] .stButton > button {
             background-color: #1d4ed8 !important;  /* blue-700 */
             color: #ffffff !important;
             border: none !important;
         }
-        div[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
+        div[data-testid="stSidebar"] .stButton button[data-testid="baseButton-primary"]:hover,
+        div[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover,
+        div[data-testid="stSidebar"] .stButton > button:hover {
             background-color: #1e40af !important;  /* blue-800 */
             color: #ffffff !important;
         }
@@ -69,6 +73,7 @@ def inject_brand_css():
         """,
         unsafe_allow_html=True
     )
+
 
 inject_brand_css()
 
