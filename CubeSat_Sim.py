@@ -1,9 +1,9 @@
 # CATSIM — CubeSat Mission Simulator
 # Cleveland Aerospace Technology Services — Davidsonville, MD
-# Features: β-angle power, aligned ECI→ECEF ground track, SoC,
-# thermal with Earth view factor, drag model, Pro-gated Save/Load/Export,
-# and Advanced Analysis (multi-β power, multi-orbit SoC, thermal envelope,
-# ground-track density, orbit lifetime curve).
+# Pricing Model:
+#   - 30-day free trial (Standard features only)
+#   - After trial: Standard $4.99/mo, Pro $9.99/mo
+#   - Advanced Analysis + Save/Load & Export are Pro-only.
 
 import json
 import io
@@ -13,6 +13,7 @@ import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
+import datetime as dt
 
 # =========================
 # Page setup & global style
@@ -361,32 +362,75 @@ class CubeSatSim:
         return np.array(out) / 1000.0  # km
 
 # =========================
-# Session & Sidebar controls
+# Session & pricing model
 # =========================
 if "user" not in st.session_state:
-    st.session_state.user = None
-if "plan" not in st.session_state:
-    st.session_state.plan = "Free"
+    st.session_state.user = None  # can be extended with real auth later
 
+# Base plan in DB terms: 'trial' | 'standard' | 'pro'
+if "plan_base" not in st.session_state:
+    st.session_state.plan_base = "trial"  # everyone starts in trial
+
+# Trial start date (for 30-day free trial)
+if "trial_start" not in st.session_state:
+    st.session_state.trial_start = dt.date.today().isoformat()  # YYYY-MM-DD
+
+# Compute effective plan
+today = dt.date.today()
+trial_start = dt.date.fromisoformat(st.session_state.trial_start)
+trial_end = trial_start + dt.timedelta(days=30)
+
+in_trial = (st.session_state.plan_base == "trial") and (today <= trial_end)
+
+# IMPORTANT CHANGE: trial only gets STANDARD features
+if in_trial:
+    plan_effective = "standard"   # NOT pro anymore
+else:
+    plan_effective = st.session_state.plan_base  # 'standard' or 'pro'
+
+st.session_state.effective_plan = plan_effective
+st.session_state.in_trial = in_trial
+st.session_state.trial_end = trial_end.isoformat()
+
+# =========================
+# Sidebar controls (including plan UI)
+# =========================
 with st.sidebar:
     st.header("Account")
     if st.session_state.user is None:
-        email = st.text_input("Email")
-        if st.button("Sign in"):
-            st.session_state.user = email or "guest"
+        email = st.text_input("Email (not wired yet)", "")
+        if st.button("Sign in (stub)"):
+            st.session_state.user = {"email": email or "guest@example.com"}
     else:
-        st.success(f"Signed in as {st.session_state.user}")
+        st.success(f"Signed in as {st.session_state.user['email']}")
         if st.button("Sign out"):
             st.session_state.user = None
-            st.session_state.plan = "Free"
 
-    st.header("Plan")
-    st.markdown(f"**Current plan:** {st.session_state.plan}")
-    if st.session_state.plan == "Free":
-        if st.button("Upgrade to Pro ($9/mo)"):
-            st.session_state.plan = "Pro"  # stub for launch
+    st.header("Plan & Billing")
+
+    if st.session_state.in_trial:
+        st.markdown(f"**Current plan:** 🧪 Trial (Standard features) — ends {st.session_state.trial_end}")
+        st.caption("During your 30-day free trial you have full access to Standard features.\n\nPro features (Advanced Analysis, Save/Load & Export) require a Pro subscription.")
     else:
-        st.success("Pro features unlocked ✓")
+        label = st.session_state.plan_base.capitalize()  # Trial / Standard / Pro
+        st.markdown(f"**Current plan:** {label}")
+
+    st.caption("Pricing: Standard $4.99/mo • Pro $9.99/mo")
+
+    if st.session_state.plan_base != "pro":
+        st.markdown("**Upgrade options (stubbed):**")
+        col_a, col_b = st.columns(2)
+        with col_a:
+            if st.button("Standard $4.99"):
+                st.session_state.plan_base = "standard"
+                st.experimental_rerun()
+        with col_b:
+            if st.button("Pro $9.99"):
+                st.session_state.plan_base = "pro"
+                st.experimental_rerun()
+        st.caption("In production, this would redirect to Stripe Checkout.")
+    else:
+        st.success("You are on the Pro plan.")
 
     st.header("Preset & Validation")
     use_genesat = st.checkbox("Load GeneSat-1 defaults", True)
@@ -439,15 +483,15 @@ if auto_cal:
         cal_factor = target_avgW / P_now
 
 # =========================
-# Tabs  (Drag moved before Advanced)
+# Tabs  (Drag before Advanced)
 # =========================
 tab_orbit, tab_power, tab_thermal, tab_drag, tab_adv, tab_io = st.tabs([
     "3D + Ground Track (aligned)", 
     "Power", 
     "Thermal", 
-    "Drag",                     # Drag now before Advanced
-    "Advanced Analysis (Pro)",  # Pro tab after Drag
-    "Save/Load & Export"
+    "Drag",                     # Drag before Advanced
+    "Advanced Analysis (Pro)",  # Pro-only
+    "Save/Load & Export (Pro)"  # Pro-only
 ])
 
 # =========================
@@ -565,7 +609,7 @@ with tab_power:
     # Orbit power profile (one orbit)
     N_orbit = 720
     t_orb, u, x_km, y_km, z_km = sim.orbit_eci(N=N_orbit)
-    dt = float(t_orb[1] - t_orb[0])
+    dt_step = float(t_orb[1] - t_orb[0])
     P_inst, cos_inc, ecl = sim.instantaneous_power(attitude, t_orb, x_km, y_km, z_km, sim.A_panel, sim.eta)
     P_inst = P_inst * cal_factor * elec_derate
 
@@ -608,10 +652,10 @@ with tab_power:
     limit_charge = st.checkbox("Limit charge power", False)
     P_chg_max = st.slider("Max charge power (W)", 1.0, 200.0, 30.0, 1.0) if limit_charge else None
 
-    total_steps = int(np.ceil((mission_days * DAY_SEC) / dt))
+    total_steps = int(np.ceil((mission_days * DAY_SEC) / dt_step))
     reps = int(np.ceil(total_steps / N_orbit))
     P_timeline = np.tile(P_inst, reps)[:total_steps]
-    t_timeline = np.arange(total_steps) * dt
+    t_timeline = np.arange(total_steps) * dt_step
 
     soc_wh = start_soc / 100.0 * batt_Wh
     soc_series = np.empty(total_steps)
@@ -622,11 +666,11 @@ with tab_power:
             P_surplus = gen - load
             if P_chg_max is not None:
                 P_surplus = min(P_surplus, P_chg_max)
-            dE_Wh = (P_surplus * eta_chg) * dt / 3600.0
+            dE_Wh = (P_surplus * eta_chg) * dt_step / 3600.0
             soc_wh = min(soc_wh + dE_Wh, batt_Wh)
         else:
             P_deficit = load - gen
-            dE_Wh = (P_deficit / eta_dis) * dt / 3600.0
+            dE_Wh = (P_deficit / eta_dis) * dt_step / 3600.0
             soc_wh = max(soc_wh - dE_Wh, 0.0)
         soc_series[k] = 100.0 * soc_wh / batt_Wh
 
@@ -641,7 +685,7 @@ with tab_power:
         soc_plot = soc_series
 
     # End-of-day SoC
-    eod_idx = (np.arange(1, mission_days + 1) * int(np.floor(DAY_SEC / dt))).clip(0, total_steps - 1)
+    eod_idx = (np.arange(1, mission_days + 1) * int(np.floor(DAY_SEC / dt_step))).clip(0, total_steps - 1)
     eod_soc = soc_series[eod_idx]
     df_soc_daily = pd.DataFrame({"Day": np.arange(1, len(eod_idx) + 1), "SoC (%)": eod_soc})
 
@@ -734,8 +778,11 @@ with tab_adv:
     st.markdown("## Advanced Analysis (Pro)")
     st.caption("Multi-β, multi-orbit, and envelope visualizations.")
 
-    if st.session_state.plan != "Pro":
-        st.info("🔒 Advanced Analysis is a **Pro-only** feature. Upgrade in the sidebar to unlock:")
+    if plan_effective != "pro":
+        st.info(
+            "🔒 Advanced Analysis is available on the Pro plan ($9.99/mo).\n\n"
+            "Your 30-day trial provides Standard features only."
+        )
         st.markdown(
             "- Multi-orbit SoC timeline\n"
             "- Multi-β power curves for all attitudes\n"
@@ -872,15 +919,18 @@ with tab_adv:
 # TAB 6: SAVE/LOAD & EXPORT (Pro-only)
 # =========================
 with tab_io:
-    st.subheader("Save/Load & Export")
-    st.markdown("⬇️ **Save / Load Missions & Export Data**", help="Pro-only features for now")
-    if st.session_state.plan != "Pro":
-        st.info("🔒 This feature is available on the **Pro plan ($9/mo)**.")
+    st.subheader("Save/Load & Export (Pro)")
+    st.markdown("⬇️ **Save / Load Missions & Export Data**")
+
+    if plan_effective != "pro":
+        st.info(
+            "🔒 Save/Load & Export are available on the Pro plan ($9.99/mo).\n\n"
+            "Your 30-day trial provides Standard features only."
+        )
         st.write("- Save mission parameters to JSON")
-        st.write("- Load mission JSON (future)")
         st.write("- Export Orbit CSV and Power CSV")
         st.write("")
-        st.write("Upgrade in the sidebar to unlock.")
+        st.write("Upgrade to Pro in the sidebar to unlock.")
     else:
         mission_params = {
             "altitude_km": altitude_km, "incl_deg": incl_deg,
