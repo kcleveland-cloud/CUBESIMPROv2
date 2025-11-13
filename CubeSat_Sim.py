@@ -437,13 +437,13 @@ with st.sidebar:
         with col_a:
             if st.button("Standard $4.99/mo"):
                 st.session_state.plan_base = "standard"
-                st.experimental_rerun()
+                st.rerun()
 
         # Pro button – primary (blue via CSS)
         with col_b:
             if st.button("🚀 Go Pro $9.99/mo", type="primary"):
                 st.session_state.plan_base = "pro"
-                st.experimental_rerun()
+                st.rerun()
 
         st.caption("In production, this would redirect to Stripe Checkout.")
     else:
