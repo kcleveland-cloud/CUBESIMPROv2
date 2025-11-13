@@ -49,18 +49,6 @@ def inject_brand_css():
         .cats-nav a:hover {
             color: #38bdf8;
         }
-        .cats-nav .cats-pill {
-            padding: 0.2rem 0.7rem;
-            border-radius: 999px;
-            background: #0f172a;
-            border: 1px solid #38bdf8;
-            color: #e0f2fe;
-            font-size: 0.85rem;
-        }
-        .cats-nav .cats-pill:hover {
-            background: #0369a1;
-            color: #f9fafb;
-        }
         /* Make tables a bit nicer */
         .dataframe th, .dataframe td {
             font-size: 0.85rem !important;
@@ -94,16 +82,13 @@ def show_header():
             """,
             unsafe_allow_html=True,
         )
-    # Simple nav bar
+    # Simple nav bar (Advanced Analysis pill removed)
     st.markdown(
         """
         <div class="cats-nav">
             <a href="#catsim--cube-sat-mission-simulator">Home</a>
             <a href="https://www.clevelandaerospace.com" target="_blank" rel="noopener noreferrer">Company</a>
             <a href="mailto:press@clevelandaerospace.com">Press</a>
-            <a class="cats-pill" href="#advanced-analysis-pro" >
-                🚀 Advanced Analysis (Pro)
-            </a>
         </div>
         """,
         unsafe_allow_html=True
@@ -382,9 +367,9 @@ trial_end = trial_start + dt.timedelta(days=30)
 
 in_trial = (st.session_state.plan_base == "trial") and (today <= trial_end)
 
-# IMPORTANT CHANGE: trial only gets STANDARD features
+# Trial only gets STANDARD features
 if in_trial:
-    plan_effective = "standard"   # NOT pro anymore
+    plan_effective = "standard"
 else:
     plan_effective = st.session_state.plan_base  # 'standard' or 'pro'
 
@@ -409,8 +394,11 @@ with st.sidebar:
     st.header("Plan & Billing")
 
     if st.session_state.in_trial:
-        st.markdown(f"**Current plan:** 🧪 Trial (Standard features) — ends {st.session_state.trial_end}")
-        st.caption("During your 30-day free trial you have full access to Standard features.\n\nPro features (Advanced Analysis, Save/Load & Export) require a Pro subscription.")
+        st.markdown(f"**Current plan:** 🧪 Trial (Standard) — ends {st.session_state.trial_end}")
+        st.caption(
+            "During your 30-day free trial you have full access to Standard features.\n\n"
+            "Pro features (Advanced Analysis, Save/Load & Export) require a Pro subscription."
+        )
     else:
         label = st.session_state.plan_base.capitalize()  # Trial / Standard / Pro
         st.markdown(f"**Current plan:** {label}")
@@ -420,17 +408,21 @@ with st.sidebar:
     if st.session_state.plan_base != "pro":
         st.markdown("**Upgrade options (stubbed):**")
         col_a, col_b = st.columns(2)
+
         with col_a:
-            if st.button("Standard $4.99"):
+            if st.button("Standard $4.99/mo"):
                 st.session_state.plan_base = "standard"
                 st.experimental_rerun()
+
+        # Make Pro button stand out more
         with col_b:
-            if st.button("Pro $9.99"):
+            if st.button("🚀 Go Pro $9.99/mo", type="primary"):
                 st.session_state.plan_base = "pro"
                 st.experimental_rerun()
+
         st.caption("In production, this would redirect to Stripe Checkout.")
     else:
-        st.success("You are on the Pro plan.")
+        st.success("✅ You are on the Pro plan.")
 
     st.header("Preset & Validation")
     use_genesat = st.checkbox("Load GeneSat-1 defaults", True)
