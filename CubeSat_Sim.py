@@ -54,20 +54,28 @@ def inject_brand_css():
             font-size: 0.85rem !important;
         }
 
-        /* Sidebar primary button (Go Pro) in blue.
-           Newer Streamlit uses data-testid="baseButton-primary" */
+        /* 🔵 Force primary buttons in the SIDEBAR to be blue via theme variables */
+        div[data-testid="stSidebar"] {
+            --button-primary-background-color: #1d4ed8 !important;           /* blue-700 */
+            --button-primary-border-color: #1d4ed8 !important;
+            --button-primary-text-color: #ffffff !important;
+            --button-primary-hover-background-color: #1e40af !important;     /* blue-800 */
+            --button-primary-hover-border-color: #1e40af !important;
+            --button-primary-focus-ring-color: #1d4ed866 !important;
+        }
+
+        /* Extra safety: directly style primary buttons in sidebar */
         div[data-testid="stSidebar"] .stButton button[data-testid="baseButton-primary"],
-        div[data-testid="stSidebar"] .stButton > button[kind="primary"],
-        div[data-testid="stSidebar"] .stButton > button {
-            background-color: #1d4ed8 !important;  /* blue-700 */
-            color: #ffffff !important;
-            border: none !important;
+        div[data-testid="stSidebar"] .stButton > button[kind="primary"] {
+            background-color: var(--button-primary-background-color) !important;
+            color: var(--button-primary-text-color) !important;
+            border-color: var(--button-primary-border-color) !important;
         }
         div[data-testid="stSidebar"] .stButton button[data-testid="baseButton-primary"]:hover,
-        div[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover,
-        div[data-testid="stSidebar"] .stButton > button:hover {
-            background-color: #1e40af !important;  /* blue-800 */
-            color: #ffffff !important;
+        div[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
+            background-color: var(--button-primary-hover-background-color) !important;
+            border-color: var(--button-primary-hover-border-color) !important;
+            color: var(--button-primary-text-color) !important;
         }
         </style>
         """,
