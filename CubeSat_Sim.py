@@ -49,9 +49,21 @@ def inject_brand_css():
         .cats-nav a:hover {
             color: #38bdf8;
         }
+
         /* Make tables a bit nicer */
         .dataframe th, .dataframe td {
             font-size: 0.85rem !important;
+        }
+
+        /* Sidebar primary button (Go Pro) in blue */
+        div[data-testid="stSidebar"] .stButton > button[kind="primary"] {
+            background-color: #1d4ed8 !important;  /* blue-700 */
+            color: #ffffff !important;
+            border: none !important;
+        }
+        div[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
+            background-color: #1e40af !important;  /* blue-800 */
+            color: #ffffff !important;
         }
         </style>
         """,
@@ -82,7 +94,7 @@ def show_header():
             """,
             unsafe_allow_html=True,
         )
-    # Simple nav bar (Advanced Analysis pill removed)
+    # Simple nav bar (no Pro pill here)
     st.markdown(
         """
         <div class="cats-nav">
@@ -414,7 +426,7 @@ with st.sidebar:
                 st.session_state.plan_base = "standard"
                 st.experimental_rerun()
 
-        # Make Pro button stand out more
+        # Pro button – primary (now overridden to blue via CSS)
         with col_b:
             if st.button("🚀 Go Pro $9.99/mo", type="primary"):
                 st.session_state.plan_base = "pro"
