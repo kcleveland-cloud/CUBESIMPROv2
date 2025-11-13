@@ -24,11 +24,16 @@ st.set_page_config(
     layout="wide"
 )
 
-# ---- Brand CSS (simple) ----
 def inject_brand_css():
     st.markdown(
         """
         <style>
+        /* Set Streamlit's global primary color to blue */
+        :root {
+            --primary-color: #1d4ed8 !important;   /* blue-700 */
+            --primaryColor: #1d4ed8 !important;    /* some themes use this */
+        }
+
         /* Top nav bar */
         .cats-nav {
             background: #020617;
@@ -55,20 +60,19 @@ def inject_brand_css():
             font-size: 0.85rem !important;
         }
 
-        /* 🔵 Force ALL primary buttons in the SIDEBAR to be blue */
-        div[data-testid="stSidebar"] .stButton > button,
-        div[data-testid="stSidebar"] button[kind="primary"],
-        div[data-testid="stSidebar"] button[data-testid="baseButton-primary"] {
-            background-color: #1d4ed8 !important;   /* blue-700 */
-            border: 1px solid #1d4ed8 !important;
+        /* Force buttons to use the blue primary color */
+        button[kind="primary"],
+        button[data-testid="baseButton-primary"],
+        div.stButton > button {
+            background-color: #1d4ed8 !important;
+            border-color: #1d4ed8 !important;
             color: #ffffff !important;
         }
 
-        /* Hover state for sidebar buttons */
-        div[data-testid="stSidebar"] .stButton > button:hover,
-        div[data-testid="stSidebar"] button[kind="primary"]:hover,
-        div[data-testid="stSidebar"] button[data-testid="baseButton-primary"]:hover {
-            background-color: #1e40af !important;   /* blue-800 */
+        button[kind="primary"]:hover,
+        button[data-testid="baseButton-primary"]:hover,
+        div.stButton > button:hover {
+            background-color: #1e40af !important;
             border-color: #1e40af !important;
             color: #ffffff !important;
         }
