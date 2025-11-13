@@ -439,10 +439,15 @@ if auto_cal:
         cal_factor = target_avgW / P_now
 
 # =========================
-# Tabs
+# Tabs  (Drag moved before Advanced)
 # =========================
-tab_orbit, tab_power, tab_thermal, tab_adv, tab_drag, tab_io = st.tabs([
-    "3D + Ground Track (aligned)", "Power", "Thermal", "Advanced Analysis (Pro)", "Drag", "Save/Load & Export"
+tab_orbit, tab_power, tab_thermal, tab_drag, tab_adv, tab_io = st.tabs([
+    "3D + Ground Track (aligned)", 
+    "Power", 
+    "Thermal", 
+    "Drag",                     # Drag now before Advanced
+    "Advanced Analysis (Pro)",  # Pro tab after Drag
+    "Save/Load & Export"
 ])
 
 # =========================
@@ -704,7 +709,26 @@ with tab_thermal:
     )
 
 # =========================
-# TAB 4: ADVANCED ANALYSIS (Pro-only)
+# TAB 4: DRAG
+# =========================
+with tab_drag:
+    st.subheader("Altitude Decay from Drag (simple mission view)")
+    A_drag = st.number_input("Reference drag area (m²)", 0.001, 2.0, sim.A_panel, 0.001)
+    alt_series = sim.drag_decay_days(mission_days, A_drag=A_drag)
+    df_alt = pd.DataFrame({"Day": np.arange(1, mission_days + 1), "Altitude (km)": alt_series})
+    st.plotly_chart(
+        px.line(
+            df_alt,
+            x="Day",
+            y="Altitude (km)",
+            markers=True,
+            title="Altitude decay over mission"
+        ),
+        use_container_width=True
+    )
+
+# =========================
+# TAB 5: ADVANCED ANALYSIS (Pro-only)
 # =========================
 with tab_adv:
     st.markdown("## Advanced Analysis (Pro)")
@@ -843,25 +867,6 @@ with tab_adv:
 
         if len(alt_series_adv):
             st.metric("Final altitude (km)", f"{alt_series_adv[-1]:.1f}")
-
-# =========================
-# TAB 5: DRAG
-# =========================
-with tab_drag:
-    st.subheader("Altitude Decay from Drag (simple mission view)")
-    A_drag = st.number_input("Reference drag area (m²)", 0.001, 2.0, sim.A_panel, 0.001)
-    alt_series = sim.drag_decay_days(mission_days, A_drag=A_drag)
-    df_alt = pd.DataFrame({"Day": np.arange(1, mission_days + 1), "Altitude (km)": alt_series})
-    st.plotly_chart(
-        px.line(
-            df_alt,
-            x="Day",
-            y="Altitude (km)",
-            markers=True,
-            title="Altitude decay over mission"
-        ),
-        use_container_width=True
-    )
 
 # =========================
 # TAB 6: SAVE/LOAD & EXPORT (Pro-only)
