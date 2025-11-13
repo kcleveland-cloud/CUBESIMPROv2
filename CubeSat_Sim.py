@@ -1,8 +1,9 @@
 # CATSIM — CubeSat Mission Simulator
 # Cleveland Aerospace Technology Services — Davidsonville, MD
-# Features: β-angle power, aligned ECI→ECEF ground track, time-resolved SoC,
+# Features: β-angle power, aligned ECI→ECEF ground track, SoC,
 # thermal with Earth view factor, drag model, Pro-gated Save/Load/Export,
-# plus full branding (logo header, nav bar, footer).
+# and Advanced Analysis (multi-β power, multi-orbit SoC, thermal envelope,
+# ground-track density, orbit lifetime curve).
 
 import json
 import io
@@ -18,7 +19,7 @@ import plotly.express as px
 # =========================
 st.set_page_config(
     page_title="CATSIM — CubeSat Mission Simulator",
-    page_icon="CATS_Logo.png",
+    page_icon="CATS_Logo.png",  # uses your logo as favicon
     layout="wide"
 )
 
@@ -74,7 +75,6 @@ inject_brand_css()
 def show_header():
     col1, col2 = st.columns([1, 3])
     with col1:
-        # Look for logo in repo or assets; simplest path is "CATS_Logo.png"
         logo_paths = ["CATS_Logo.png", "assets/CATS_Logo.png"]
         shown = False
         for p in logo_paths:
@@ -100,8 +100,8 @@ def show_header():
             <a href="#catsim--cube-sat-mission-simulator">Home</a>
             <a href="https://www.clevelandaerospace.com" target="_blank" rel="noopener noreferrer">Company</a>
             <a href="mailto:press@clevelandaerospace.com">Press</a>
-            <a class="cats-pill" href="#save-load--export" >
-                🚀 Try CATSIM Pro
+            <a class="cats-pill" href="#advanced-analysis-pro" >
+                🚀 Advanced Analysis (Pro)
             </a>
         </div>
         """,
@@ -249,6 +249,17 @@ class CubeSatSim:
         z = r_km * np.sin(u) * np.sin(self.i)
         return t, u, x, y, z
 
+    def long_orbit_eci(self, num_orbits=10, N_per_orbit=720):
+        """Multi-orbit trajectory for density maps etc."""
+        total_pts = int(num_orbits * N_per_orbit)
+        t = np.linspace(0.0, num_orbits * self.T_orbit, total_pts, endpoint=False)
+        u = self.n * t
+        r_km = self.r / 1000.0
+        x = r_km * np.cos(u)
+        y = r_km * np.sin(u) * np.cos(self.i)
+        z = r_km * np.sin(u) * np.sin(self.i)
+        return t, u, x, y, z
+
     def ground_track_from_eci(self, t, x_eci_km, y_eci_km, z_eci_km):
         x_m = x_eci_km * 1000.0
         y_m = y_eci_km * 1000.0
@@ -311,7 +322,7 @@ class CubeSatSim:
         return float(P.mean())
 
     # ---------- Thermal (avg equilibrium) ----------
-    def thermal_equilibrium(self, A_abs=None, A_rad=None, Q_internal_W=0.0):
+    def thermal_equilibrium(self, A_abs=None, A_rad=None, Q_internal_W=0.0, beta_for_thermal=None):
         """
         Q_solar_avg + Q_albedo_avg + Q_IR + Q_internal = ε σ A_rad T^4
         """
@@ -320,7 +331,8 @@ class CubeSatSim:
         if A_rad is None:
             A_rad = 6.0 * self.A_panel
 
-        efrac = self.eclipse_fraction()
+        beta_local = self.beta_deg if beta_for_thermal is None else float(beta_for_thermal)
+        efrac = eclipse_fraction_beta(self.h, beta_local)
         VF = self.VF
 
         Q_solar = SOLAR_CONST * self.alpha * A_abs * (1.0 - efrac)
@@ -429,8 +441,8 @@ if auto_cal:
 # =========================
 # Tabs
 # =========================
-tab_orbit, tab_power, tab_thermal, tab_drag, tab_io = st.tabs([
-    "3D + Ground Track (aligned)", "Power", "Thermal", "Drag", "Save/Load & Export"
+tab_orbit, tab_power, tab_thermal, tab_adv, tab_drag, tab_io = st.tabs([
+    "3D + Ground Track (aligned)", "Power", "Thermal", "Advanced Analysis (Pro)", "Drag", "Save/Load & Export"
 ])
 
 # =========================
@@ -539,18 +551,17 @@ with tab_orbit:
     st.caption("Tip: increasing |β| shortens/eradicates eclipse; beyond a critical β there's no eclipse.")
 
 # =========================
-# TAB 2: POWER (time-resolved SoC)
+# TAB 2: POWER (SoC basic + β sweep)
 # =========================
 with tab_power:
-    st.subheader("Power — instantaneous, average, β-sweep, and SoC (time-resolved)")
-    st.caption("Orbit-average power is usually 30–60% of peak. Benchmarks: GeneSat-1 ≈ 4–5 W OAP (3U body-mounted).")
+    st.subheader("Power — instantaneous, average, β-sweep, and SoC")
+    st.caption("Orbit-average power is usually 30–60% of peak. GeneSat-1 ≈ 4–5 W OAP (3U body-mounted).")
 
     # Orbit power profile (one orbit)
     N_orbit = 720
     t_orb, u, x_km, y_km, z_km = sim.orbit_eci(N=N_orbit)
     dt = float(t_orb[1] - t_orb[0])
     P_inst, cos_inc, ecl = sim.instantaneous_power(attitude, t_orb, x_km, y_km, z_km, sim.A_panel, sim.eta)
-    # Apply calibration toward target (for presets) + electrical derate
     P_inst = P_inst * cal_factor * elec_derate
 
     # Instantaneous power plot
@@ -565,8 +576,8 @@ with tab_power:
         use_container_width=True
     )
 
-    # β-sweep (OAP vs β)
-    st.markdown("### β-angle sweep: Orbit-average power vs β")
+    # β-sweep (OAP vs β) — single-attitude view
+    st.markdown("### β-angle sweep (current attitude)")
     betas = np.linspace(-80, 80, 161)
     oap = np.array([sim.avg_power_at_beta(attitude, b, sim.A_panel, sim.eta) for b in betas])
     oap_scaled = oap * cal_factor * elec_derate
@@ -576,14 +587,14 @@ with tab_power:
             df_beta,
             x="beta_deg",
             y="OAP_W",
-            title="Orbit-average Power vs β-angle",
+            title=f"Orbit-average Power vs β-angle ({attitude})",
             labels={"beta_deg": "β (deg)", "OAP_W": "Orbit-average Power (W)"}
         ),
         use_container_width=True
     )
 
-    # ---------- Time-resolved SoC ----------
-    st.markdown("### Battery & Load")
+    # ---------- SoC basic (mission-resolved) ----------
+    st.markdown("### Battery & Load (baseline SoC)")
     cons_W = st.slider("Average consumption (W)", 0.1, 50.0, 3.0, 0.1)
     batt_Wh = st.slider("Battery capacity (Wh)", 5.0, 1000.0, 30.0, 1.0)
     start_soc = st.slider("Start SoC (%)", 0, 100, 50)
@@ -642,7 +653,7 @@ with tab_power:
             x=ts_plot,
             y=soc_plot,
             labels={"x": "Mission time (hours)", "y": "SoC (%)"},
-            title="Battery SoC (time-resolved)"
+            title="Battery SoC (mission time)"
         ),
         use_container_width=True
     )
@@ -663,10 +674,10 @@ with tab_power:
         st.success("Battery SoC projection looks acceptable.")
 
 # =========================
-# TAB 3: THERMAL
+# TAB 3: THERMAL (single β case)
 # =========================
 with tab_thermal:
-    st.subheader("Radiative Thermal Equilibrium (averaged)")
+    st.subheader("Radiative Thermal Equilibrium (current β)")
     A_abs = st.number_input("Absorbing area A_abs (m²)", 0.001, 2.0, sim.A_panel, 0.001)
     A_rad = st.number_input("Radiating area A_rad (m²)", 0.005, 2.0, 6.0 * sim.A_panel, 0.005)
     Q_int = st.number_input("Internal dissipation Q_internal (W)", 0.0, 50.0, 0.0, 0.1)
@@ -687,16 +698,163 @@ with tab_thermal:
             dfQ.melt(var_name="Component", value_name="W"),
             x="Component",
             y="W",
-            title="Absorbed power components"
+            title="Absorbed power components (current β)"
         ),
         use_container_width=True
     )
 
 # =========================
-# TAB 4: DRAG
+# TAB 4: ADVANCED ANALYSIS (Pro-only)
+# =========================
+with tab_adv:
+    st.markdown("## Advanced Analysis (Pro)")
+    st.caption("Multi-β, multi-orbit, and envelope visualizations.")
+
+    if st.session_state.plan != "Pro":
+        st.info("🔒 Advanced Analysis is a **Pro-only** feature. Upgrade in the sidebar to unlock:")
+        st.markdown(
+            "- Multi-orbit SoC timeline\n"
+            "- Multi-β power curves for all attitudes\n"
+            "- Thermal envelope vs β\n"
+            "- Ground-track density map\n"
+            "- Extended orbit lifetime curve"
+        )
+        st.stop()
+
+    # ---------- 1) Multi-β power curves for all attitudes ----------
+    st.markdown("### 1. Multi-β Power Curves (all attitudes)")
+    betas_adv = np.linspace(-80, 80, 97)
+    att_list = ["body-spin", "sun-tracking", "nadir-pointing"]
+    rows = []
+    for att in att_list:
+        for b in betas_adv:
+            oap_val = sim.avg_power_at_beta(att, b, sim.A_panel, sim.eta)
+            rows.append({
+                "beta_deg": b,
+                "OAP_W": oap_val * cal_factor * elec_derate,
+                "Attitude": att
+            })
+    df_multi_beta = pd.DataFrame(rows)
+    fig_multi_beta = px.line(
+        df_multi_beta,
+        x="beta_deg",
+        y="OAP_W",
+        color="Attitude",
+        labels={"beta_deg": "β (deg)", "OAP_W": "Orbit-average Power (W)"},
+        title="Orbit-average Power vs β for Multiple Attitudes"
+    )
+    st.plotly_chart(fig_multi_beta, use_container_width=True)
+
+    # ---------- 2) Multi-orbit SoC plot (mission-level) ----------
+    st.markdown("### 2. Multi-orbit Battery SoC (mission timeline)")
+    st.caption("Same SoC model as Power tab, shown here as a multi-orbit mission trace.")
+
+    # Reuse same mission SoC logic but compute fresh to keep tab self-contained
+    N_orbit_adv = 720
+    t_orb_adv, u_adv, x_km_adv, y_km_adv, z_km_adv = sim.orbit_eci(N=N_orbit_adv)
+    dt_adv = float(t_orb_adv[1] - t_orb_adv[0])
+    P_inst_adv, _, _ = sim.instantaneous_power(attitude, t_orb_adv, x_km_adv, y_km_adv, z_km_adv, sim.A_panel, sim.eta)
+    P_inst_adv = P_inst_adv * cal_factor * elec_derate
+
+    total_steps_adv = int(np.ceil((mission_days * DAY_SEC) / dt_adv))
+    reps_adv = int(np.ceil(total_steps_adv / N_orbit_adv))
+    P_timeline_adv = np.tile(P_inst_adv, reps_adv)[:total_steps_adv]
+    t_timeline_adv = np.arange(total_steps_adv) * dt_adv
+
+    soc_wh_adv = start_soc / 100.0 * batt_Wh
+    soc_series_adv = np.empty(total_steps_adv)
+    for k in range(total_steps_adv):
+        gen = P_timeline_adv[k]
+        load = cons_W
+        if gen >= load:
+            P_surplus = gen - load
+            if P_chg_max is not None:
+                P_surplus = min(P_surplus, P_chg_max)
+            dE_Wh = (P_surplus * eta_chg) * dt_adv / 3600.0
+            soc_wh_adv = min(soc_wh_adv + dE_Wh, batt_Wh)
+        else:
+            P_deficit = load - gen
+            dE_Wh = (P_deficit / eta_dis) * dt_adv / 3600.0
+            soc_wh_adv = max(soc_wh_adv - dE_Wh, 0.0)
+        soc_series_adv[k] = 100.0 * soc_wh_adv / batt_Wh
+
+    ts_plot_adv = t_timeline_adv / 3600.0
+    st.plotly_chart(
+        px.line(
+            x=ts_plot_adv,
+            y=soc_series_adv,
+            labels={"x": "Mission time (hours)", "y": "SoC (%)"},
+            title="Multi-orbit Battery SoC — mission timeline"
+        ),
+        use_container_width=True
+    )
+
+    # ---------- 3) Thermal envelope vs β ----------
+    st.markdown("### 3. Thermal Envelope vs β")
+    st.caption("Equilibrium temperature as a function of β for the same geometry/areas above.")
+
+    betas_th = np.linspace(-80, 80, 65)
+    temps_eq = []
+    for b in betas_th:
+        T_eq_b, *_ = sim.thermal_equilibrium(A_abs=A_abs, A_rad=A_rad, Q_internal_W=Q_int, beta_for_thermal=b)
+        temps_eq.append(T_eq_b)
+    df_temp = pd.DataFrame({"beta_deg": betas_th, "T_eq_C": temps_eq})
+    fig_temp = px.line(
+        df_temp,
+        x="beta_deg",
+        y="T_eq_C",
+        labels={"beta_deg": "β (deg)", "T_eq_C": "Equilibrium Temp (°C)"},
+        title="Equilibrium Temperature vs β"
+    )
+    st.plotly_chart(fig_temp, use_container_width=True)
+
+    c_min, c_max = st.columns(2)
+    c_min.metric("Min T_eq over β (°C)", f"{df_temp['T_eq_C'].min():.1f}")
+    c_max.metric("Max T_eq over β (°C)", f"{df_temp['T_eq_C'].max():.1f}")
+
+    # ---------- 4) Ground-track density plot ----------
+    st.markdown("### 4. Ground-track Density Map")
+    dens_days = st.slider("Days for density map", 1, min(60, mission_days), min(7, mission_days))
+    num_orbits_dens = max(1, int(np.ceil(dens_days * DAY_SEC / sim.T_orbit)))
+
+    t_long, u_long, x_long, y_long, z_long = sim.long_orbit_eci(num_orbits=num_orbits_dens, N_per_orbit=360)
+    lon_long, lat_long = sim.ground_track_from_eci(t_long, x_long, y_long, z_long)
+
+    df_dens = pd.DataFrame({"lon": lon_long, "lat": lat_long})
+    fig_dens = px.density_heatmap(
+        df_dens,
+        x="lon",
+        y="lat",
+        nbinsx=72,
+        nbinsy=36,
+        labels={"lon": "Longitude (deg)", "lat": "Latitude (deg)"},
+        title=f"Ground-track Density over ~{dens_days} days"
+    )
+    st.plotly_chart(fig_dens, use_container_width=True)
+
+    # ---------- 5) Orbit lifetime curve (extended) ----------
+    st.markdown("### 5. Orbit Lifetime Curve (Drag Decay)")
+    lifetime_days = st.slider("Lifetime analysis (days)", mission_days, 3650, max(mission_days, 365))
+    A_drag_adv = st.number_input("Drag area A_drag (m²) for lifetime", 0.001, 2.0, sim.A_panel, 0.001)
+
+    alt_series_adv = sim.drag_decay_days(lifetime_days, A_drag=A_drag_adv)
+    df_alt_adv = pd.DataFrame({"Day": np.arange(1, lifetime_days + 1), "Altitude (km)": alt_series_adv})
+    fig_alt_adv = px.line(
+        df_alt_adv,
+        x="Day",
+        y="Altitude (km)",
+        title="Orbit Lifetime Curve (Altitude vs Day)"
+    )
+    st.plotly_chart(fig_alt_adv, use_container_width=True)
+
+    if len(alt_series_adv):
+        st.metric("Final altitude (km)", f"{alt_series_adv[-1]:.1f}")
+
+# =========================
+# TAB 5: DRAG (simple mission-level)
 # =========================
 with tab_drag:
-    st.subheader("Altitude Decay from Drag (simple model)")
+    st.subheader("Altitude Decay from Drag (simple mission view)")
     A_drag = st.number_input("Reference drag area (m²)", 0.001, 2.0, sim.A_panel, 0.001)
     alt_series = sim.drag_decay_days(mission_days, A_drag=A_drag)
     df_alt = pd.DataFrame({"Day": np.arange(1, mission_days + 1), "Altitude (km)": alt_series})
@@ -712,7 +870,7 @@ with tab_drag:
     )
 
 # =========================
-# TAB 5: SAVE/LOAD & EXPORT (Pro-only)
+# TAB 6: SAVE/LOAD & EXPORT (Pro-only)
 # =========================
 with tab_io:
     st.subheader("Save/Load & Export")
@@ -720,7 +878,7 @@ with tab_io:
     if st.session_state.plan != "Pro":
         st.info("🔒 This feature is available on the **Pro plan ($9/mo)**.")
         st.write("- Save mission parameters to JSON")
-        st.write("- Load mission JSON")
+        st.write("- Load mission JSON (future)")
         st.write("- Export Orbit CSV and Power CSV")
         st.write("")
         st.write("Upgrade in the sidebar to unlock.")
