@@ -31,7 +31,7 @@ def inject_brand_css():
         /* Set Streamlit's global primary color to blue */
         :root {
             --primary-color: #1d4ed8 !important;   /* blue-700 */
-            --primaryColor: #1d4ed8 !important;    /* some themes use this */
+            --primaryColor: #1d4ed8 !important;
         }
 
         /* Top nav bar */
@@ -60,40 +60,36 @@ def inject_brand_css():
             font-size: 0.85rem !important;
         }
 
-        /* Force buttons to use the blue primary color */
+        /* PRIMARY buttons (e.g., Go Pro) — blue */
         button[kind="primary"],
-        button[data-testid="baseButton-primary"],
-        div.stButton > button {
+        button[data-testid="baseButton-primary"] {
             background-color: #1d4ed8 !important;
             border-color: #1d4ed8 !important;
             color: #ffffff !important;
         }
-
         button[kind="primary"]:hover,
-        button[data-testid="baseButton-primary"]:hover,
-        div.stButton > button:hover {
+        button[data-testid="baseButton-primary"]:hover {
             background-color: #1e40af !important;
             border-color: #1e40af !important;
             color: #ffffff !important;
         }
-        /* --- Make the Standard (non-primary) plan button white --- */
-div[data-testid="stSidebar"] .stButton > button:not([kind="primary"]) {
-    background-color: #ffffff !important;
-    color: #1d4ed8 !important;             /* blue text */
-    border: 1px solid #1d4ed8 !important;  /* blue border */
-}
 
-/* Hover state */
-div[data-testid="stSidebar"] .stButton > button:not([kind="primary"]):hover {
-    background-color: #ebf2ff !important;  /* light blue on hover */
-    color: #1d4ed8 !important;
-    border-color: #1d4ed8 !important;
-}
-
+        /* SIDEBAR NON-primary buttons (e.g., Standard, Sign in) — white with blue border */
+        div[data-testid="stSidebar"] button:not([data-testid="baseButton-primary"]) {
+            background-color: #ffffff !important;
+            color: #1d4ed8 !important;
+            border: 1px solid #1d4ed8 !important;
+        }
+        div[data-testid="stSidebar"] button:not([data-testid="baseButton-primary"]):hover {
+            background-color: #eff6ff !important;  /* light blue */
+            color: #1d4ed8 !important;
+            border-color: #1d4ed8 !important;
+        }
         </style>
         """,
         unsafe_allow_html=True
     )
+
 
 inject_brand_css()
 
