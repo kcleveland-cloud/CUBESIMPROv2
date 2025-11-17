@@ -11,7 +11,7 @@ import requests
 # ---------------------------
 
 def auth0_login_button():
-    """Show a 'Sign in with Auth0' link."""
+    """Show a 'Sign in' link."""
     domain = st.secrets["AUTH0_DOMAIN"]
     client_id = st.secrets["AUTH0_CLIENT_ID"]
     redirect_uri = st.secrets["AUTH0_CALLBACK_URL"]
@@ -27,6 +27,10 @@ def auth0_login_button():
     )
 
     st.markdown(f"[Sign in with Auth0]({auth_url})")
+
+with st.sidebar:
+    if user:
+        st.write(f"Signed in as **{user['email']}**")
 
 
 def auth0_handle_callback():
