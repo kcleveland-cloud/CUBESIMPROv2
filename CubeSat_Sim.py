@@ -117,7 +117,7 @@ with st.sidebar:
     if user.get("name"):
         st.write(f"({user['name']})")
 
-st.title("CATSIM — CubeSat Mission Simulator")
+
 # ... rest of your CATSIM app ...
 
         
