@@ -1175,37 +1175,32 @@ with tab_thermal:
         temp_min = -40.0
         temp_max = 80.0
 
-        fig_gauge = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=T_c,
-            number={"suffix": " °C"},
-            title={"text": "Equilibrium body temperature"},
-            gauge={
-                "axis": {"range": [temp_min, temp_max], "tickwidth": 1},
-                "bar": {"color": "#f97316"},
-                "steps": [
-                    {"range": [temp_min, -10], "color": "#0ea5e9"},
-                    {"range": [-10, 40], "color": "#22c55e"},
-                    {"range": [40, temp_max], "color": "#ef4444"},
-                ],
-                "threshold": {
-                    "line": {"color": "#111827", "width": 3},
-                    "thickness": 0.75,
-                    "value": T_c,
-                },
-            },
-        ))
+fig_gauge = go.Figure(go.Indicator(
+    mode="gauge+number",
+    value=T_c,
+    number={"suffix": " °C", "font": {"size": 28}},
+    title={"text": "Equilibrium Body Temp", "font": {"size": 16}, "align": "center"},
+    gauge={
+        "axis": {"range": [temp_min, temp_max], "tickwidth": 1},
+        "bar": {"color": "#f97316"},
+        "steps": [
+            {"range": [temp_min, -10], "color": "#0ea5e9"},
+            {"range": [-10, 40], "color": "#22c55e"},
+            {"range": [40, temp_max], "color": "#ef4444"},
+        ],
+        "threshold": {
+            "line": {"color": "#111827", "width": 3},
+            "thickness": 0.75,
+            "value": T_c,
+        },
+    },
+))
 
-        fig_gauge.update_layout(
-            margin=dict(l=10, r=10, t=40, b=10),
-            height=260,   # smaller so it fits comfortably in the column
-        )
-
-        st.plotly_chart(fig_gauge, use_container_width=True)
-        st.caption(
-            "Blue = cold, green = nominal band, red = hot. Adjust α/ε, radiating area, "
-            "or internal dissipation to see the CubeSat color and gauge move."
-        )
+fig_gauge.update_layout(
+    margin=dict(l=10, r=10, t=10, b=10),   # 🔥 Much smaller top margin
+    height=300,                             # 🔥 Slightly taller so title never clips
+)
+st.plotly_chart(fig_gauge, use_container_width=True)
 
     # --- Heat balance breakdown (kept as a full-width graphic) ---
     st.markdown("### Heat balance breakdown")
