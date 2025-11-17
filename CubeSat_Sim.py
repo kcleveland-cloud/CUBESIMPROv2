@@ -1144,60 +1144,6 @@ with tab_drag:
         use_container_width=True
     )
 
-    st.markdown("### NASA Orbital Debris Compliance (25-year rule)")
-
-    solar_choice = st.radio(
-        "Solar activity assumption (for debris lifetime)",
-        ["Low", "Nominal", "High"],
-        index=1,
-        horizontal=True,
-    )
-    solar_scale = {"Low": 0.7, "Nominal": 1.0, "High": 1.4}[solar_choice]
-
-    disposal_mode = st.selectbox(
-        "End-of-mission disposal strategy",
-        [
-            "Natural decay from mission orbit",
-            "Propulsive deorbit to lower circular orbit",
-            "Drag augmentation device deployment",
-        ],
-    )
-
-    sma_km = (R_E + altitude_km * 1000.0) / 1000.0
-    ecc = 0.0
-    mission_life_years = mission_days / 365.0
-
-    od_result = nasa_debris_compliance_check(
-        sma_km=sma_km,
-        ecc=ecc,
-        mass_kg=mass_kg,
-        cross_section_m2=panel_area,
-        cd=Cd,
-        solar_activity_scale=solar_scale,
-    )
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Perigee altitude", f"{od_result['perigee_alt_km']:.0f} km")
-    c2.metric("Est. post-mission lifetime", f"{od_result['lifetime_years']:.1f} years")
-    c3.metric("Compliance status", f"{od_result['emoji']} {od_result['status']}")
-
-    st.markdown(f"**Interpretation:** {od_result['note']}")
-
-    odar_text = generate_odar_summary_text(
-        mission_name="CATSIM Mission",
-        sma_km=sma_km,
-        ecc=ecc,
-        inc_deg=incl_deg,
-        mass_kg=mass_kg,
-        cross_section_m2=panel_area,
-        mission_life_years=mission_life_years,
-        disposal_mode=disposal_mode,
-        compliance_result=od_result,
-    )
-
-    st.markdown("#### ODAR Narrative (copy into your documentation)")
-    st.text_area("ODAR Summary", odar_text, height=280)
-
 
 # --- TAB 5: VERIFICATION (Heritage) ---
 with tab_verify:
@@ -1306,7 +1252,7 @@ with tab_verify:
 # --- TAB 6: ADVANCED (Pro-only) ---
 with tab_adv:
     st.markdown("## Advanced Analysis (Pro)")
-    st.caption("Multi-β, multi-orbit, and envelope visualizations.")
+    st.caption("Multi-β, multi-orbit, thermal envelope, debris compliance, and lifetime visualizations.")
 
     if plan_effective != "pro":
         st.info(
@@ -1314,13 +1260,16 @@ with tab_adv:
             "Your 30-day trial provides Standard features only."
         )
         st.markdown(
-            "- Multi-orbit SoC timeline\n"
             "- Multi-β power curves for all attitudes\n"
+            "- Multi-orbit SoC timeline\n"
             "- Thermal envelope vs β\n"
             "- Ground-track density map\n"
+            "- NASA Orbital Debris Compliance (25-year rule)\n"
             "- Extended orbit lifetime curve"
         )
     else:
+        # 1. Multi-β power curves
+        st.markdown("### 1. Orbit-average Power vs β for Multiple Attitudes")
         betas_adv = np.linspace(-80, 80, 97)
         att_list = ["body-spin", "sun-tracking", "nadir-pointing"]
         rows = []
@@ -1343,6 +1292,7 @@ with tab_adv:
         )
         st.plotly_chart(fig_multi_beta, use_container_width=True)
 
+        # 2. Multi-orbit SoC
         st.markdown("### 2. Multi-orbit Battery SoC (mission timeline)")
         N_orbit_adv = 720
         t_orb_adv, u_adv, x_km_adv, y_km_adv, z_km_adv = sim.orbit_eci(N=N_orbit_adv)
@@ -1383,6 +1333,7 @@ with tab_adv:
             use_container_width=True
         )
 
+        # 3. Thermal envelope vs β
         st.markdown("### 3. Thermal Envelope vs β")
         betas_th = np.linspace(-80, 80, 65)
         temps_eq = []
@@ -1403,6 +1354,7 @@ with tab_adv:
         c_min.metric("Min T_eq over β (°C)", f"{df_temp['T_eq_C'].min():.1f}")
         c_max.metric("Max T_eq over β (°C)", f"{df_temp['T_eq_C'].max():.1f}")
 
+        # 4. Ground-track density map
         st.markdown("### 4. Ground-track Density Map")
         dens_days = st.slider("Days for density map", 1, min(60, mission_days), min(7, mission_days))
         num_orbits_dens = max(1, int(np.ceil(dens_days * DAY_SEC / sim.T_orbit)))
@@ -1422,6 +1374,7 @@ with tab_adv:
         )
         st.plotly_chart(fig_dens, use_container_width=True)
 
+        # 5. Orbit lifetime curve (drag decay)
         st.markdown("### 5. Orbit Lifetime Curve (Drag Decay)")
         lifetime_days = st.slider("Lifetime analysis (days)", mission_days, 3650, max(mission_days, 365))
         A_drag_adv = st.number_input("Drag area A_drag (m²) for lifetime", 0.001, 2.0, sim.A_panel, 0.001)
@@ -1438,6 +1391,61 @@ with tab_adv:
 
         if len(alt_series_adv):
             st.metric("Final altitude (km)", f"{alt_series_adv[-1]:.1f}")
+
+        # 6. NASA Orbital Debris Compliance (25-year rule)
+        st.markdown("### 6. NASA Orbital Debris Compliance (25-year rule)")
+
+        solar_choice = st.radio(
+            "Solar activity assumption (for debris lifetime)",
+            ["Low", "Nominal", "High"],
+            index=1,
+            horizontal=True,
+        )
+        solar_scale = {"Low": 0.7, "Nominal": 1.0, "High": 1.4}[solar_choice]
+
+        disposal_mode = st.selectbox(
+            "End-of-mission disposal strategy",
+            [
+                "Natural decay from mission orbit",
+                "Propulsive deorbit to lower circular orbit",
+                "Drag augmentation device deployment",
+            ],
+        )
+
+        sma_km = (R_E + altitude_km * 1000.0) / 1000.0
+        ecc = 0.0
+        mission_life_years = mission_days / 365.0
+
+        od_result = nasa_debris_compliance_check(
+            sma_km=sma_km,
+            ecc=ecc,
+            mass_kg=mass_kg,
+            cross_section_m2=panel_area,
+            cd=Cd,
+            solar_activity_scale=solar_scale,
+        )
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Perigee altitude", f"{od_result['perigee_alt_km']:.0f} km")
+        c2.metric("Est. post-mission lifetime", f"{od_result['lifetime_years']:.1f} years")
+        c3.metric("Compliance status", f"{od_result['emoji']} {od_result['status']}")
+
+        st.markdown(f"**Interpretation:** {od_result['note']}")
+
+        odar_text = generate_odar_summary_text(
+            mission_name="CATSIM Mission",
+            sma_km=sma_km,
+            ecc=ecc,
+            inc_deg=incl_deg,
+            mass_kg=mass_kg,
+            cross_section_m2=panel_area,
+            mission_life_years=mission_life_years,
+            disposal_mode=disposal_mode,
+            compliance_result=od_result,
+        )
+
+        st.markdown("#### ODAR Narrative (copy into your documentation)")
+        st.text_area("ODAR Summary", odar_text, height=280)
 
 
 # --- TAB 7: SAVE/LOAD & EXPORT (Pro-only) ---
