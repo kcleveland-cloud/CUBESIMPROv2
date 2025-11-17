@@ -1216,15 +1216,7 @@ with tab_power:
 with tab_thermal:
     st.subheader("Radiative Thermal Equilibrium (current β)")
 
-    # --- Model selection ---
-    model_choice = st.radio(
-        "Thermal model",
-        ["Single-node (lumped bus)", "Two-node (shell + interior)"],
-        index=0,
-        horizontal=True,
-    )
-
-    # --- Inputs shared by both models ---
+    # --- Inputs and basic 1-node result ---
     A_abs = st.number_input(
         "Absorbing area A_abs (m²)",
         0.001, 2.0,
@@ -1237,84 +1229,32 @@ with tab_thermal:
         6.0 * sim.A_panel,
         0.005
     )
-    Q_int_total = st.number_input(
-        "Total internal dissipation Q_internal (W)",
+    Q_int = st.number_input(
+        "Internal dissipation Q_internal (W)",
         0.0, 50.0,
-        5.0, 0.1
+        0.0, 0.1
     )
-    Q_int = Q_int_total  # keep for Advanced Analysis thermal envelope
 
+    # Keep Q_int around for Advanced thermal envelope section
+    Q_int_total = Q_int
 
-    # --- Run selected model ---
-    if model_choice == "Single-node (lumped bus)":
-        # Original 1-node model: entire bus at one temperature
-        T_shell_C, Qs, Qa, Qir, Qin, Qtot = sim.thermal_equilibrium(
-            A_abs=A_abs,
-            A_rad=A_rad,
-            Q_internal_W=Q_int_total
-        )
-        T_int_C = T_shell_C  # interior assumed same as shell in 1-node
+    T_c, Qs, Qa, Qir, Qin, Qtot = sim.thermal_equilibrium(
+        A_abs=A_abs,
+        A_rad=A_rad,
+        Q_internal_W=Q_int
+    )
 
-        dfQ = pd.DataFrame([{
-            "Solar_avg_W": Qs,
-            "Albedo_W": Qa,
-            "Earth_IR_W": Qir,
-            "Internal_total_W": Qin,
-            "Total_abs_W": Qtot,
-            "Model": "1-node",
-        }])
+    # Shell temp only in this tab (no interior in 1-node model)
+    st.metric("Shell equilibrium temp (°C)", f"{T_c:.2f}")
 
-    else:
-        # 2-node model: split internal power + conduction between shell & interior
-        st.markdown("#### Two-node parameters")
-        frac_int = st.slider(
-            "Fraction of internal power in **interior** node",
-            0.0, 1.0,
-            0.8, 0.05
-        )
-        k_cond = st.slider(
-            "Lumped conduction between shell and interior (W/K)",
-            0.1, 10.0,
-            1.0, 0.1
-        )
+    dfQ = pd.DataFrame([{
+        "Solar_avg_W": Qs,
+        "Albedo_W": Qa,
+        "Earth_IR_W": Qir,
+        "Internal_W": Qin,
+        "Total_abs_W": Qtot
+    }])
 
-        Q_int_int = Q_int_total * frac_int
-        Q_int_shell = Q_int_total * (1.0 - frac_int)
-
-        T_shell_C, T_int_C, thermo_diag = sim.thermal_equilibrium_2node(
-            A_abs_shell=A_abs,
-            A_rad_shell=A_rad,
-            Q_int_shell_W=Q_int_shell,
-            Q_int_interior_W=Q_int_int,
-            k_cond_W_per_K=k_cond,
-            beta_for_thermal=None,  # use current sim.beta_deg
-            T_shell_init_C=0.0,
-            T_int_init_C=0.0,
-        )
-
-        dfQ = pd.DataFrame([{
-            "Solar_avg_W": thermo_diag["Q_solar_shell_W"],
-            "Albedo_W": thermo_diag["Q_albedo_shell_W"],
-            "Earth_IR_W": thermo_diag["Q_ir_shell_W"],
-            "Internal_shell_W": thermo_diag["Q_int_shell_W"],
-            "Internal_interior_W": thermo_diag["Q_int_interior_W"],
-            "Shell_rad_to_space_W": thermo_diag["Q_rad_shell_W"],
-            "Shell_cond_from_int_W": thermo_diag["Q_cond_shell_W"],
-            "Model": "2-node",
-        }])
-
-    # Use shell temperature as the "external body" indicator for visuals
-    T_c = T_shell_C
-
-    # --- Temperature metrics ---
-if model_choice == "Single-node (lumped bus)":
-    # Only show shell temperature
-    st.metric("Shell equilibrium temp (°C)", f"{T_shell_C:.2f}")
-else:
-    # Show both for 2-node model
-    col_ts, col_ti = st.columns(2)
-    col_ts.metric("Shell equilibrium temp (°C)", f"{T_shell_C:.2f}")
-    col_ti.metric("Interior equilibrium temp (°C)", f"{T_int_C:.2f}")
     # --- Visuals: CubeSat rectangle + compact gauge ---
     cube_col, gauge_col = st.columns([1, 1.4])
 
@@ -1352,9 +1292,9 @@ else:
             unsafe_allow_html=True,
         )
 
-    # Gauge for shell temperature
+    # Gauge (shell temperature)
     with gauge_col:
-        st.markdown("### Thermal gauge (shell)")
+        st.markdown("### Thermal gauge")
 
         temp_min = -40.0
         temp_max = 80.0
@@ -1387,21 +1327,18 @@ else:
 
         st.plotly_chart(fig_gauge, use_container_width=True)
         st.caption(
-            "Blue = cold, green = nominal, red = hot. "
-            "In the two-node model, the interior node can be warmer or cooler than the shell "
-            "depending on internal power and conduction."
+            "Blue = cold, green = nominal, red = hot. Adjust α/ε, radiating area, or internal power to move the temperature."
         )
 
     # --- Heat breakdown ---
     st.markdown("### Heat balance breakdown")
     st.dataframe(dfQ, use_container_width=True)
-
     st.plotly_chart(
         px.bar(
             dfQ.melt(var_name="Component", value_name="W"),
             x="Component",
             y="W",
-            title="Absorbed / exchanged power components (current β)"
+            title="Absorbed power components (current β)"
         ),
         use_container_width=True
     )
@@ -1633,6 +1570,80 @@ with tab_adv:
         c_min, c_max = st.columns(2)
         c_min.metric("Min T_eq over β (°C)", f"{df_temp['T_eq_C'].min():.1f}")
         c_max.metric("Max T_eq over β (°C)", f"{df_temp['T_eq_C'].max():.1f}")
+        # 3b. Two-node Thermal Analysis (shell + interior)
+        st.markdown("### 3b. Two-node Thermal Analysis (Shell + Interior)")
+
+        A_abs_2 = st.number_input(
+            "Absorbing area A_abs (m²) — 2-node thermal",
+            0.001, 2.0,
+            sim.A_panel,
+            0.001,
+            key="th2_A_abs"
+        )
+        A_rad_2 = st.number_input(
+            "Radiating area A_rad (m²) — 2-node thermal",
+            0.005, 2.0,
+            6.0 * sim.A_panel,
+            0.005,
+            key="th2_A_rad"
+        )
+        Q_int_total_2 = st.number_input(
+            "Total internal dissipation Q_internal (W) — 2-node thermal",
+            0.0, 50.0,
+            5.0, 0.1,
+            key="th2_Q"
+        )
+        frac_int_2 = st.slider(
+            "Fraction of internal power in interior node",
+            0.0, 1.0,
+            0.8, 0.05,
+            key="th2_frac"
+        )
+        k_cond_2 = st.slider(
+            "Conduction between shell and interior (W/K)",
+            0.1, 10.0,
+            1.0, 0.1,
+            key="th2_kcond"
+        )
+
+        Q_int_int_2 = Q_int_total_2 * frac_int_2
+        Q_int_shell_2 = Q_int_total_2 * (1.0 - frac_int_2)
+
+        T_shell_C_2, T_int_C_2, thermo_diag_2 = sim.thermal_equilibrium_2node(
+            A_abs_shell=A_abs_2,
+            A_rad_shell=A_rad_2,
+            Q_int_shell_W=Q_int_shell_2,
+            Q_int_interior_W=Q_int_int_2,
+            k_cond_W_per_K=k_cond_2,
+            beta_for_thermal=None,  # use current sim.beta_deg
+            T_shell_init_C=0.0,
+            T_int_init_C=0.0,
+        )
+
+        c_ts2, c_ti2 = st.columns(2)
+        c_ts2.metric("Shell equilibrium temp (°C)", f"{T_shell_C_2:.2f}")
+        c_ti2.metric("Interior equilibrium temp (°C)", f"{T_int_C_2:.2f}")
+
+        dfQ2 = pd.DataFrame([{
+            "Solar_shell_W": thermo_diag_2["Q_solar_shell_W"],
+            "Albedo_shell_W": thermo_diag_2["Q_albedo_shell_W"],
+            "Earth_IR_shell_W": thermo_diag_2["Q_ir_shell_W"],
+            "Internal_shell_W": thermo_diag_2["Q_int_shell_W"],
+            "Internal_interior_W": thermo_diag_2["Q_int_interior_W"],
+            "Shell_rad_to_space_W": thermo_diag_2["Q_rad_shell_W"],
+            "Cond_from_interior_W": thermo_diag_2["Q_cond_shell_W"],
+        }])
+
+        st.dataframe(dfQ2, use_container_width=True)
+        st.plotly_chart(
+            px.bar(
+                dfQ2.melt(var_name="Component", value_name="W"),
+                x="Component",
+                y="W",
+                title="Two-node thermal power balance (shell + interior)"
+            ),
+            use_container_width=True
+        )
 
         # 4. Ground-track density map
         st.markdown("### 4. Ground-track Density Map")
