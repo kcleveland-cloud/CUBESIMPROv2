@@ -864,7 +864,7 @@ tab_orbit, tab_power, tab_thermal, tab_drag, tab_verify, tab_adv, tab_io = st.ta
     "3D + Ground Track (aligned)",
     "Power",
     "Thermal",
-    "Drag & Debris",
+    "Drag",
     "Verification (Heritage)",
     "Advanced Analysis (Pro)",
     "Save/Load & Export (Pro)"
