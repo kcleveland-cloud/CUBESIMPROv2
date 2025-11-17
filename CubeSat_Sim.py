@@ -3,6 +3,15 @@ import urllib.parse
 import requests
 from jose import jwt
 
+# =========================
+# Auth0 config (temporary)
+# =========================
+AUTH0_DOMAIN = "dev-qwn3runpmc616as6.us.auth0.com"
+AUTH0_CLIENT_ID = "XvRZKwcHlcToRYGMMwnZiNjLnNzJmUmU"
+AUTH0_CLIENT_SECRET = "YOUR_REAL_CLIENT_SECRET_HERE"
+AUTH0_CALLBACK_URL = "https://cubesimprov2-lt6hcgkvpdvygnwbktyqdg.streamlit.app"
+
+
 # ---------------------------
 # Simple Auth0 helpers inline
 # ---------------------------
@@ -18,9 +27,9 @@ if missing:
 
 def auth0_login_url():
     """Build the Auth0 login URL."""
-    domain = st.secrets["AUTH0_DOMAIN"]
-    client_id = st.secrets["AUTH0_CLIENT_ID"]
-    redirect_uri = st.secrets["AUTH0_CALLBACK_URL"]
+    domain = AUTH0_DOMAIN
+    client_id = AUTH0_CLIENT_ID
+    redirect_uri = AUTH0_CALLBACK_URL
 
     params = {
         "response_type": "code",
@@ -39,10 +48,10 @@ def login_button():
 
 def _exchange_code_for_tokens(code: str):
     """Talk to Auth0 /oauth/token to trade code for tokens."""
-    domain = st.secrets["AUTH0_DOMAIN"]
-    client_id = st.secrets["AUTH0_CLIENT_ID"]
-    client_secret = st.secrets["AUTH0_CLIENT_SECRET"]
-    redirect_uri = st.secrets["AUTH0_CALLBACK_URL"]
+    domain = AUTH0_DOMAIN
+    client_id = AUTH0_CLIENT_ID
+    client_secret = AUTH0_CLIENT_SECRET
+    redirect_uri = AUTH0_CALLBACK_URL
 
     token_url = f"https://{domain}/oauth/token"
     data = {
