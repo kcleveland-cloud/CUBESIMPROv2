@@ -1307,10 +1307,14 @@ with tab_thermal:
     T_c = T_shell_C
 
     # --- Temperature metrics ---
+if model_choice == "Single-node (lumped bus)":
+    # Only show shell temperature
+    st.metric("Shell equilibrium temp (°C)", f"{T_shell_C:.2f}")
+else:
+    # Show both for 2-node model
     col_ts, col_ti = st.columns(2)
     col_ts.metric("Shell equilibrium temp (°C)", f"{T_shell_C:.2f}")
     col_ti.metric("Interior equilibrium temp (°C)", f"{T_int_C:.2f}")
-
     # --- Visuals: CubeSat rectangle + compact gauge ---
     cube_col, gauge_col = st.columns([1, 1.4])
 
