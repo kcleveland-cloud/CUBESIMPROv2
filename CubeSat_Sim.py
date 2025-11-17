@@ -1123,7 +1123,7 @@ with tab_thermal:
         6.0 * sim.A_panel,
         0.005
     )
-        Q_int_total = st.number_input(
+    Q_int_total = st.number_input(
         "Total internal dissipation Q_internal (W)",
         0.0, 50.0,
         5.0, 0.1
