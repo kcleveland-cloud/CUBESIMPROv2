@@ -6,6 +6,11 @@ from jose import jwt
 # ---------------------------
 # Simple Auth0 helpers inline
 # ---------------------------
+required_keys = ["AUTH0_DOMAIN", "AUTH0_CLIENT_ID", "AUTH0_CLIENT_SECRET", "AUTH0_CALLBACK_URL"]
+missing = [k for k in required_keys if k not in st.secrets]
+if missing:
+    st.error(f"Missing Streamlit secrets: {', '.join(missing)}. Go to Settings → Secrets and add them.")
+    st.stop()
 
 # ---------------------------
 # Auth0 helpers (simple flow)
