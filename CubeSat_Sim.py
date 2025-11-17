@@ -26,7 +26,7 @@ def auth0_login_button():
         })
     )
 
-    st.markdown(f"[Sign in with Auth0]({auth_url})")
+    st.markdown(f"[Sign in]({auth_url})")
 
 
 
