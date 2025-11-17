@@ -1123,11 +1123,13 @@ with tab_thermal:
         6.0 * sim.A_panel,
         0.005
     )
-    Q_int_total = st.number_input(
+        Q_int_total = st.number_input(
         "Total internal dissipation Q_internal (W)",
         0.0, 50.0,
         5.0, 0.1
     )
+    Q_int = Q_int_total  # keep for Advanced Analysis thermal envelope
+
 
     # --- Run selected model ---
     if model_choice == "Single-node (lumped bus)":
