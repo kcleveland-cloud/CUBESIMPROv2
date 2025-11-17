@@ -28,6 +28,15 @@ def auth0_is_logged_in():
     # so you can get past the ModuleNotFoundError. We'll wire this up properly next.
     return False
 
+# Backwards-compatible wrappers so existing code still works
+def login_button():
+    auth0_login_button()
+
+def get_user():
+    # For now just return True/False like auth0_is_logged_in.
+    # Later we can make this return a user object instead.
+    return auth0_is_logged_in()
+
 
 st.title("CATSIM — CubeSat Simulator")
 
