@@ -1125,28 +1125,23 @@ with tab_thermal:
     # --- Visuals: CubeSat rectangle + compact gauge ---
     cube_col, gauge_col = st.columns([1, 1.4])
 
-    # Decide CubeSat color based on temperature bands
+    # Decide CubeSat color
     if T_c <= -10:
-        cube_color = "#0ea5e9"  # cold / blue
+        cube_color = "#0ea5e9"
         cube_label = "Cold regime"
     elif T_c < 40:
-        cube_color = "#22c55e"  # nominal / green
+        cube_color = "#22c55e"
         cube_label = "Nominal regime"
     else:
-        cube_color = "#ef4444"  # hot / red
+        cube_color = "#ef4444"
         cube_label = "Hot regime"
 
+    # CubeSat rectangle
     with cube_col:
         st.markdown("### CubeSat body view")
         st.markdown(
             f"""
-            <div style="
-                display:flex;
-                flex-direction:column;
-                align-items:center;
-                justify-content:center;
-                padding-top:0.5rem;
-            ">
+            <div style="display:flex; flex-direction:column; align-items:center;">
               <div style="
                   width:110px;
                   height:170px;
@@ -1155,13 +1150,8 @@ with tab_thermal:
                   background:{cube_color};
                   box-shadow:0 10px 18px rgba(15,23,42,0.35);
               "></div>
-              <div style="
-                  margin-top:0.5rem;
-                  font-size:0.85rem;
-                  color:#6b7280;
-                  text-align:center;
-              ">
-                CubeSat body (color indicates thermal regime)<br>
+              <div style="margin-top:0.5rem; font-size:0.85rem; color:#6b7280; text-align:center;">
+                CubeSat body (thermal indicator)<br>
                 <span style="font-weight:600;">{cube_label}</span>
               </div>
             </div>
@@ -1169,40 +1159,45 @@ with tab_thermal:
             unsafe_allow_html=True,
         )
 
+    # Gauge
     with gauge_col:
         st.markdown("### Thermal gauge")
 
         temp_min = -40.0
         temp_max = 80.0
 
-fig_gauge = go.Figure(go.Indicator(
-    mode="gauge+number",
-    value=T_c,
-    number={"suffix": " °C", "font": {"size": 28}},
-    title={"text": "Equilibrium Body Temp", "font": {"size": 16}, "align": "center"},
-    gauge={
-        "axis": {"range": [temp_min, temp_max], "tickwidth": 1},
-        "bar": {"color": "#f97316"},
-        "steps": [
-            {"range": [temp_min, -10], "color": "#0ea5e9"},
-            {"range": [-10, 40], "color": "#22c55e"},
-            {"range": [40, temp_max], "color": "#ef4444"},
-        ],
-        "threshold": {
-            "line": {"color": "#111827", "width": 3},
-            "thickness": 0.75,
-            "value": T_c,
-        },
-    },
-))
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=T_c,
+            number={"suffix": " °C", "font": {"size": 28}},
+            title={"text": "Equilibrium Body Temp", "font": {"size": 16}, "align": "center"},
+            gauge={
+                "axis": {"range": [temp_min, temp_max], "tickwidth": 1},
+                "bar": {"color": "#f97316"},
+                "steps": [
+                    {"range": [temp_min, -10], "color": "#0ea5e9"},
+                    {"range": [-10, 40], "color": "#22c55e"},
+                    {"range": [40, temp_max], "color": "#ef4444"},
+                ],
+                "threshold": {
+                    "line": {"color": "#111827", "width": 3},
+                    "thickness": 0.75,
+                    "value": T_c,
+                },
+            },
+        ))
 
-fig_gauge.update_layout(
-    margin=dict(l=10, r=10, t=10, b=10),   # 🔥 Much smaller top margin
-    height=300,                             # 🔥 Slightly taller so title never clips
-)
-st.plotly_chart(fig_gauge, use_container_width=True)
+        fig_gauge.update_layout(
+            margin=dict(l=10, r=10, t=10, b=10),
+            height=300,
+        )
 
-    # --- Heat balance breakdown (kept as a full-width graphic) ---
+        st.plotly_chart(fig_gauge, use_container_width=True)
+        st.caption(
+            "Blue = cold, green = nominal, red = hot. Adjust α/ε, radiating area, or internal power to move the temperature."
+        )
+
+    # --- Heat breakdown ---
     st.markdown("### Heat balance breakdown")
     st.dataframe(dfQ, use_container_width=True)
     st.plotly_chart(
@@ -1214,8 +1209,6 @@ st.plotly_chart(fig_gauge, use_container_width=True)
         ),
         use_container_width=True
     )
-
-
 
 # --- TAB 4: DRAG & DEBRIS ---
 with tab_drag:
