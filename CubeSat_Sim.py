@@ -101,9 +101,6 @@ def get_user():
     return None
 
 
-
-st.title("CATSIM — CubeSat Simulator")
-
 user = get_user()
 if not user:
     st.title("CATSIM — Sign in")
