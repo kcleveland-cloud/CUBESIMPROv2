@@ -109,13 +109,7 @@ if not user:
     st.stop()
 
 
-# Sidebar info for signed-in user
-with st.sidebar:
-    st.markdown("---")
-    st.write("**Signed in as:**")
-    st.write(user.get("email", "Unknown user"))
-    if user.get("name"):
-        st.write(f"({user['name']})")
+
 
 
 # ... rest of your CATSIM app ...
