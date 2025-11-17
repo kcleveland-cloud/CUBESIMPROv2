@@ -1101,21 +1101,74 @@ with tab_power:
 # --- TAB 3: THERMAL ---
 with tab_thermal:
     st.subheader("Radiative Thermal Equilibrium (current β)")
-    A_abs = st.number_input("Absorbing area A_abs (m²)", 0.001, 2.0, sim.A_panel, 0.001)
-    A_rad = st.number_input("Radiating area A_rad (m²)", 0.005, 2.0, 6.0 * sim.A_panel, 0.005)
-    Q_int = st.number_input("Internal dissipation Q_internal (W)", 0.0, 50.0, 0.0, 0.1)
 
-    T_c, Qs, Qa, Qir, Qin, Qtot = sim.thermal_equilibrium(A_abs=A_abs, A_rad=A_rad, Q_internal_W=Q_int)
-    st.metric("Equilibrium temperature (°C)", f"{T_c:.2f}")
+    col_inputs, col_gfx = st.columns([1, 1.2])
 
-    dfQ = pd.DataFrame([{
-        "Solar_avg_W": Qs,
-        "Albedo_W": Qa,
-        "Earth_IR_W": Qir,
-        "Internal_W": Qin,
-        "Total_abs_W": Qtot
-    }])
-    st.dataframe(dfQ, use_container_width=True)
+    with col_inputs:
+        A_abs = st.number_input("Absorbing area A_abs (m²)", 0.001, 2.0, sim.A_panel, 0.001)
+        A_rad = st.number_input("Radiating area A_rad (m²)", 0.005, 2.0, 6.0 * sim.A_panel, 0.005)
+        Q_int = st.number_input("Internal dissipation Q_internal (W)", 0.0, 50.0, 0.0, 0.1)
+
+        T_c, Qs, Qa, Qir, Qin, Qtot = sim.thermal_equilibrium(
+            A_abs=A_abs,
+            A_rad=A_rad,
+            Q_internal_W=Q_int
+        )
+
+        st.metric("Equilibrium temperature (°C)", f"{T_c:.2f}")
+
+        dfQ = pd.DataFrame([{
+            "Solar_avg_W": Qs,
+            "Albedo_W": Qa,
+            "Earth_IR_W": Qir,
+            "Internal_W": Qin,
+            "Total_abs_W": Qtot
+        }])
+        st.dataframe(dfQ, use_container_width=True)
+
+    with col_gfx:
+        st.markdown("### Thermal gauge")
+
+        # Define a reasonable temperature range for smallsats
+        temp_min = -40.0
+        temp_max = 80.0
+
+        # Simple interpretation bands
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=T_c,
+            number={"suffix": " °C"},
+            title={"text": "Body temperature"},
+            gauge={
+                "axis": {"range": [temp_min, temp_max], "tickwidth": 1},
+                "bar": {"color": "#f97316"},
+                "steps": [
+                    {"range": [temp_min, -10], "color": "#0ea5e9"},
+                    {"range": [-10, 40], "color": "#22c55e"},
+                    {"range": [40, temp_max], "color": "#ef4444"},
+                ],
+                "threshold": {
+                    "line": {"color": "#111827", "width": 3},
+                    "thickness": 0.8,
+                    "value": T_c,
+                },
+            },
+        ))
+
+        fig_gauge.update_layout(
+            margin=dict(l=10, r=10, t=40, b=10),
+            height=320,
+        )
+
+        st.plotly_chart(fig_gauge, use_container_width=True)
+
+        st.caption(
+            "Blue = cold, green = nominal band, red = hot. Adjust absorptivity, emissivity, "
+            "radiating area, or internal dissipation to see how the equilibrium point moves."
+        )
+
+    # Existing bar plot of heat contributions (kept below the 2-column layout)
+    st.markdown("### Heat balance breakdown")
     st.plotly_chart(
         px.bar(
             dfQ.melt(var_name="Component", value_name="W"),
@@ -1125,6 +1178,7 @@ with tab_thermal:
         ),
         use_container_width=True
     )
+
 
 
 # --- TAB 4: DRAG & DEBRIS ---
