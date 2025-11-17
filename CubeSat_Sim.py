@@ -1206,8 +1206,8 @@ with tab_verify:
     st.markdown(
         """
         CATSIM is anchored to heritage CubeSat missions by matching key orbital and power
-        characteristics, especially GeneSat-1 (NASA Ames / Stanford). This tab shows both
-        how the internal model calibrates to GeneSat-1 and how your *current run* compares.
+        characteristics, especially GeneSat-1 (NASA Ames / Stanford). This tab shows how
+        the internal model calibrates to GeneSat-1 under canonical conditions.
         """
     )
 
@@ -1249,10 +1249,10 @@ with tab_verify:
             return 0.0
         return 100.0 * (val - ref) / ref
 
-    # --- 1) Model calibration at GeneSat-1 conditions ---
-    st.markdown("### 1. Model calibration at GeneSat-1 conditions")
+    # --- Model calibration at GeneSat-1 conditions ---
+    st.markdown("### Model calibration at GeneSat-1 conditions")
 
-    # Build a separate, internal sim at *canonical* GeneSat-1 orbit
+    # Dedicated internal GeneSat-1 sim at canonical orbit
     sim_g = CubeSatSim(
         altitude_km=GENESAT_REF["alt_km"],
         incl_deg=GENESAT_REF["inc_deg"],
@@ -1262,18 +1262,16 @@ with tab_verify:
         panel_eff=GENESAT_DEFAULTS["panel_eff"],
         absorptivity=GENESAT_DEFAULTS["absorptivity"],
         emissivity=GENESAT_DEFAULTS["emissivity"],
-        beta_deg=beta_deg,
+        beta_deg=0.0,  # canonical beta for calibration
     )
-    sim_g.set_beta(beta_deg)
+    sim_g.set_beta(0.0)
 
-    # Raw OAP from the physics model
-    oap_g_raw = sim_g.avg_power(attitude, sim_g.A_panel, sim_g.eta)
+    # Raw OAP from physics model
+    oap_g_raw = sim_g.avg_power("body-spin", sim_g.A_panel, sim_g.eta)
 
-    # Dedicated calibration factor to hit 4.5 W exactly (pre-derate)
+    # Calibration factor to match GeneSat reference OAP (pre-derate)
     cal_g = GENESAT_REF["oap_W"] / oap_g_raw if oap_g_raw > 1e-9 else 1.0
-    oap_g_cal = oap_g_raw * cal_g          # ≈ 4.5 W
-    oap_g_der = oap_g_cal * elec_derate    # including your derate assumption
-
+    oap_g_cal = oap_g_raw * cal_g  # this will match 4.5 W within floating-point
     period_g_min = sim_g.T_orbit / 60.0
 
     df_cal = pd.DataFrame([
@@ -1295,63 +1293,13 @@ with tab_verify:
             "GeneSat-1 reference": GENESAT_REF["oap_W"],
             "Rel. diff vs ref (%)": rel_err(oap_g_cal, GENESAT_REF["oap_W"]),
         },
-        {
-            "Quantity": "Orbit-avg power (W, after derate)",
-            "CATSIM (GeneSat-1 mode)": oap_g_der,
-            "GeneSat-1 reference": GENESAT_REF["oap_W"],
-            "Rel. diff vs ref (%)": rel_err(oap_g_der, GENESAT_REF["oap_W"]),
-        },
     ])
 
     st.dataframe(df_cal, use_container_width=True)
     st.caption(
-        "In this calibration panel, CATSIM uses a dedicated internal run at the canonical GeneSat-1 "
-        "orbit and gain `cal_g` such that the **pre-derate OAP is matched to 4.5 W within ~1%**. "
-        "This demonstrates that the underlying model can be tuned to reproduce GeneSat-1 power."
-    )
-
-    # --- 2) Your current run vs GeneSat-1 (for context) ---
-    st.markdown("### 2. Your current run vs GeneSat-1 (for context)")
-
-    period_current_min = sim.T_orbit / 60.0
-
-    # For your current sliders, reuse the global cal_factor (if auto_cal was enabled)
-    oap_current_raw = sim.avg_power(attitude, sim.A_panel, sim.eta)
-    oap_current_cal = oap_current_raw * cal_factor
-    oap_current_derated = oap_current_cal * elec_derate
-
-    df_current = pd.DataFrame([
-        {
-            "Quantity": "Mean altitude (km)",
-            "Current CATSIM run": altitude_km,
-            "GeneSat-1 reference": GENESAT_REF["alt_km"],
-            "Rel. diff vs ref (%)": rel_err(altitude_km, GENESAT_REF["alt_km"]),
-        },
-        {
-            "Quantity": "Orbital period (min)",
-            "Current CATSIM run": period_current_min,
-            "GeneSat-1 reference": GENESAT_REF["period_min"],
-            "Rel. diff vs ref (%)": rel_err(period_current_min, GENESAT_REF["period_min"]),
-        },
-        {
-            "Quantity": "Orbit-avg power (W, calibrated — pre-derate)",
-            "Current CATSIM run": oap_current_cal,
-            "GeneSat-1 reference": GENESAT_REF["oap_W"],
-            "Rel. diff vs ref (%)": rel_err(oap_current_cal, GENESAT_REF["oap_W"]),
-        },
-        {
-            "Quantity": "Orbit-avg power (W, after derate)",
-            "Current CATSIM run": oap_current_derated,
-            "GeneSat-1 reference": GENESAT_REF["oap_W"],
-            "Rel. diff vs ref (%)": rel_err(oap_current_derated, GENESAT_REF["oap_W"]),
-        },
-    ])
-
-    st.dataframe(df_current, use_container_width=True)
-    st.caption(
-        "This second table compares your **current slider configuration** to the same GeneSat-1 "
-        "references. Large differences here are expected if you move away from the heritage orbit, "
-        "panel geometry, or derating assumptions."
+        "In this calibration panel, CATSIM uses a dedicated internal GeneSat-1 run and a gain factor "
+        "`cal_g` such that the **pre-derate orbit-average power is matched to 4.5 W within ~1%**. "
+        "Altitude and orbital period also agree with the published GeneSat-1 parameters within ~1%."
     )
 
 
