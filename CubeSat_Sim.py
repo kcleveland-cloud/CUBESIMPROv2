@@ -1,3 +1,16 @@
+import streamlit as st
+from auth0_login import login_button, get_user
+
+st.title("CATSIM — CubeSat Simulator")
+
+if not get_user():
+    st.write("Please sign in to continue.")
+    login_button()
+    st.stop()
+
+st.success("You are logged in!")
+# ... rest of your simulator here ...
+
 # CATSIM — CubeSat Mission Simulator
 # Cleveland Aerospace Technology Services — Davidsonville, MD
 # Pricing Model:
