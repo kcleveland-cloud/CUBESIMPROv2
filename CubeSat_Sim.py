@@ -478,7 +478,7 @@ class CubeSatSim:
         return float(T_K - 273.15), Q_solar, Q_albedo, Q_ir, float(Q_internal_W), float(Q_total)
 
 
-        def thermal_equilibrium_2node(
+            def thermal_equilibrium_2node(
         self,
         A_abs_shell=None,
         A_rad_shell=None,
@@ -490,19 +490,15 @@ class CubeSatSim:
         T_int_init_C=0.0,
         max_iter=200,
         tol_K=1e-3,
-        ):
+    ):
         """
         Simple 2-node, orbit-average thermal model:
-        - Node 1: external shell (sees Sun/albedo/IR, radiates to space)
-        - Node 2: interior (only internal dissipation + conduction to shell)
-
-        Returns
-        -------
-        T_shell_C : float
-        T_int_C   : float
-        diagnostics : dict
+        - Shell node sees solar, albedo, IR & radiates to space.
+        - Interior node receives internal dissipation and conducts to shell.
+        Returns (T_shell_C, T_int_C, diagnostics).
         """
-        import math  # local import is fine; or move to top of file
+
+        import math  # local import OK
 
         # --- Areas ---
         if A_abs_shell is None:
@@ -512,43 +508,48 @@ class CubeSatSim:
 
         # --- β and eclipse fraction ---
         beta_local = self.beta_deg if beta_for_thermal is None else float(beta_for_thermal)
-        efrac = eclipse_fraction_beta(self.h, beta_local)  # orbit-average eclipse fraction
-        VF = self.VF  # Earth view factor
+        efrac = eclipse_fraction_beta(self.h, beta_local)
+        VF = self.VF
 
-        # --- Orbit-average external heating on shell (same physics as 1-node) ---
+        # --- Orbit-average fluxes on shell ---
         Q_solar_shell = SOLAR_CONST * self.alpha * A_abs_shell * (1.0 - efrac)
         Q_albedo_shell = ALBEDO * SOLAR_CONST * self.alpha * A_abs_shell * VF * (1.0 - efrac)
         Q_ir_shell = EARTH_IR * self.eps * A_abs_shell * VF
 
         Q_env_shell = Q_solar_shell + Q_albedo_shell + Q_ir_shell
+
         Q_int_shell = float(Q_int_shell_W)
         Q_int_int = float(Q_int_interior_W)
 
-        # --- Initial temps (K) ---
+        # --- Initial guesses in Kelvin ---
         T_shell = T_shell_init_C + 273.15
         T_int = T_int_init_C + 273.15
 
         converged = False
 
-        # --- Fixed-point / Newton-like iteration ---
+        # --- Iterate ---
         for it in range(max_iter):
-            # Radiative loss from shell to space
+
+            # Radiation from shell to space
             Q_rad_shell = self.eps * SIGMA * A_rad_shell * (T_shell**4)
 
-            # Conduction (positive when heat flows from interior to shell)
+            # Conduction between nodes
             Q_cond_shell = k_cond_W_per_K * (T_int - T_shell)
-            Q_cond_int = -Q_cond_shell  # equal and opposite
+            Q_cond_int = -Q_cond_shell
 
-            # Residuals: want these = 0 at equilibrium
-            # Shell: env + internal + conduction - radiation_to_space = 0
+            # Residual equations
             R_shell = Q_env_shell + Q_int_shell + Q_cond_shell - Q_rad_shell
-            # Interior: internal + conduction = 0
             R_int = Q_int_int + Q_cond_int
 
-            # Linearized denominators (dQ/dT) for a simple Newton step
-            dQdT_shell = 4.0 * self.eps * SIGMA * A_rad_shell * (T_shell**3) + k_cond_W_per_K + 1e-6
+            # Jacobians (dQ/dT)
+            dQdT_shell = (
+                4.0 * self.eps * SIGMA * A_rad_shell * (T_shell**3)
+                + k_cond_W_per_K
+                + 1e-6
+            )
             dQdT_int = k_cond_W_per_K + 1e-6
 
+            # Newton steps
             dT_shell = R_shell / dQdT_shell
             dT_int = R_int / dQdT_int
 
@@ -557,13 +558,15 @@ class CubeSatSim:
 
             # Convergence check
             if max(abs(T_shell_new - T_shell), abs(T_int_new - T_int)) < tol_K:
-                T_shell, T_int = T_shell_new, T_int_new
+                T_shell = T_shell_new
+                T_int = T_int_new
                 converged = True
                 break
 
-            T_shell, T_int = T_shell_new, T_int_new
+            T_shell = T_shell_new
+            T_int = T_int_new
 
-        # Final recompute of key terms
+        # Final heat terms
         Q_rad_shell = self.eps * SIGMA * A_rad_shell * (T_shell**4)
         Q_cond_shell = k_cond_W_per_K * (T_int - T_shell)
         Q_cond_int = -Q_cond_shell
@@ -586,6 +589,7 @@ class CubeSatSim:
         }
 
         return (T_shell - 273.15), (T_int - 273.15), diagnostics
+
 
     def drag_decay_days(self, days, A_drag=None):
         A = self.A_panel if A_drag is None else float(A_drag)
