@@ -149,6 +149,20 @@ def inject_brand_css():
             color: #38bdf8;
         }
 
+        /* Flight heritage badge */
+        .badge-heritage {
+            display: inline-block;
+            padding: 0.20rem 0.6rem;
+            border-radius: 999px;
+            border: 1px solid #16a34a;
+            background: rgba(22, 163, 74, 0.08);
+            color: #15803d;
+            font-size: 0.78rem;
+            font-weight: 550;
+            letter-spacing: 0.01em;
+            margin-bottom: 0.35rem;
+        }
+
         .dataframe th, .dataframe td {
             font-size: 0.85rem !important;
         }
@@ -252,6 +266,7 @@ DAY_SEC = 86400.0
 # For debris lifetime modeling
 R_EARTH_KM = R_E / 1000.0
 
+
 def clamp_angle_deg(a):
     return (a + 180.0) % 360.0 - 180.0
 
@@ -320,6 +335,53 @@ GENESAT_DEFAULTS = dict(
     emissivity=0.83,
     target_avg_power_W=4.5
 )
+
+# Heritage mission references (GeneSat-1, PharmaSat, O/OREOS)
+GENESAT_REF = {
+    "alt_km": 416.5,
+    "inc_deg": 40.0,
+    "period_min": 92.9,
+    "mass_kg": 4.6,
+    "oap_W": 4.5,
+}
+
+PHARMASAT_DEFAULTS = dict(
+    altitude_km=459.0,
+    incl_deg=40.4,
+    mass_kg=4.5,
+    Cd=2.2,
+    panel_area_m2=0.03,
+    panel_eff=0.25,
+    absorptivity=0.65,
+    emissivity=0.83,
+)
+
+PHARMASAT_REF = {
+    "alt_km": 459.0,
+    "inc_deg": 40.4,
+    "period_min": 93.52,
+    "mass_kg": 4.5,
+    "oap_W": 4.5,
+}
+
+OOREOS_DEFAULTS = dict(
+    altitude_km=630.0,
+    incl_deg=72.0,
+    mass_kg=5.5,
+    Cd=2.2,
+    panel_area_m2=0.03,
+    panel_eff=0.25,
+    absorptivity=0.65,
+    emissivity=0.83,
+)
+
+OOREOS_REF = {
+    "alt_km": 630.0,
+    "inc_deg": 72.0,
+    "period_min": 97.7,
+    "mass_kg": 5.5,
+    "oap_W": 4.5,
+}
 
 
 class CubeSatSim:
@@ -500,7 +562,6 @@ def _interp_lifetime_base(perigee_alt_km: float) -> float:
     """
     import math
 
-    # Below lowest point: extrapolate using first segment
     if perigee_alt_km <= LIFETIME_REF_TABLE[0][0]:
         h0, t0 = LIFETIME_REF_TABLE[0]
         h1, t1 = LIFETIME_REF_TABLE[1]
@@ -510,7 +571,6 @@ def _interp_lifetime_base(perigee_alt_km: float) -> float:
         logt = logt0 + slope * (perigee_alt_km - h0)
         return max(math.exp(logt), 0.01)
 
-    # Above highest point: extrapolate using last segment
     if perigee_alt_km >= LIFETIME_REF_TABLE[-1][0]:
         h0, t0 = LIFETIME_REF_TABLE[-2]
         h1, t1 = LIFETIME_REF_TABLE[-1]
@@ -520,7 +580,6 @@ def _interp_lifetime_base(perigee_alt_km: float) -> float:
         logt = logt1 + slope * (perigee_alt_km - h1)
         return math.exp(logt)
 
-    # Inside table: find bracket and interpolate
     for (h0, t0), (h1, t1) in zip(LIFETIME_REF_TABLE[:-1], LIFETIME_REF_TABLE[1:]):
         if h0 <= perigee_alt_km <= h1:
             logt0 = math.log(t0)
@@ -529,7 +588,6 @@ def _interp_lifetime_base(perigee_alt_km: float) -> float:
             logt = logt0 + f * (logt1 - logt0)
             return math.exp(logt)
 
-    # Fallback
     return 25.0
 
 
@@ -554,18 +612,16 @@ def estimate_orbital_lifetime_years(
     import math
 
     if perigee_alt_km < 150.0:
-        return 0.0  # essentially immediate reentry
+        return 0.0
 
-    base_life = _interp_lifetime_base(perigee_alt_km)  # ref BC, nominal solar
+    base_life = _interp_lifetime_base(perigee_alt_km)
 
-    # Ballistic coefficient scaling
     if mass_kg is not None and cross_section_m2 is not None and cross_section_m2 > 0.0:
-        bc = mass_kg / (cd * cross_section_m2)  # kg/m^2
+        bc = mass_kg / (cd * cross_section_m2)
         bc_scale = bc / BC_REF_KG_M2
     else:
         bc_scale = 1.0
 
-    # Solar activity scaling (higher activity -> more drag -> shorter lifetime)
     if solar_activity_scale <= 0.0:
         solar_activity_scale = 1.0
 
@@ -583,17 +639,7 @@ def nasa_debris_compliance_check(
 ) -> dict:
     """
     Evaluate NASA 25-year post-mission disposal compliance (LEO).
-
-    Returns:
-        {
-            "perigee_alt_km": ...,
-            "lifetime_years": ...,
-            "status": "Compliant" | "Borderline" | "Not Compliant",
-            "emoji": "✅/⚠️/❌",
-            "note": "...",
-        }
     """
-    # Perigee radius and altitude
     r_p_km = sma_km * (1.0 - ecc)
     h_p_km = r_p_km - R_EARTH_KM
 
@@ -605,7 +651,6 @@ def nasa_debris_compliance_check(
         solar_activity_scale=solar_activity_scale,
     )
 
-    # NASA 25-year guideline
     if lifetime_years <= 25.0:
         status = "Compliant"
         emoji = "✅"
@@ -652,18 +697,6 @@ def generate_odar_summary_text(
 ) -> str:
     """
     Generate an ODAR-style narrative for LEO post-mission disposal.
-
-    Args:
-        mission_name: e.g., "CATSIM Demo CubeSat"
-        sma_km, ecc: orbit elements at end-of-mission / disposal orbit
-        inc_deg: inclination [deg] (optional)
-        mass_kg, cross_section_m2: spacecraft properties (optional)
-        mission_life_years: planned operational life (optional)
-        disposal_mode: short description, e.g.
-            - "Natural decay from mission orbit"
-            - "Propulsive deorbit to lower circular orbit"
-            - "Drag augmentation device deployment"
-        compliance_result: output of nasa_debris_compliance_check()
     """
     h_p = compliance_result["perigee_alt_km"]
     t_life = compliance_result["lifetime_years"]
@@ -734,7 +767,6 @@ def generate_odar_summary_text(
 # =========================
 # Pricing model & plan state
 # =========================
-# Base plan in DB terms: 'trial' | 'standard' | 'pro'
 if "plan_base" not in st.session_state:
     st.session_state.plan_base = "trial"  # everyone starts in trial
 
@@ -784,7 +816,6 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
 
-        # Radio just selects what you *want* the plan to be
         dev_choice = st.radio(
             "Simulated plan",
             ["Use real plan", "Trial", "Standard", "Pro"],
@@ -793,7 +824,6 @@ with st.sidebar:
             label_visibility="collapsed",
         )
 
-        # Button actually applies it (one-shot)
         if st.button("Apply dev plan"):
             if dev_choice == "Trial":
                 st.session_state.plan_base = "trial"
@@ -802,12 +832,9 @@ with st.sidebar:
                 st.session_state.plan_base = "standard"
             elif dev_choice == "Pro":
                 st.session_state.plan_base = "pro"
-            # "Use real plan" means: don't override plan_base
-
             st.rerun()
 
     # --- Plan UI ---
-
     if st.session_state.in_trial:
         st.markdown(f"**Current plan:** 🧪 Trial (Standard) — ends {st.session_state.trial_end}")
         st.caption(
@@ -815,7 +842,7 @@ with st.sidebar:
             "Pro features (Advanced Analysis, Save/Load & Export) require a Pro subscription."
         )
     else:
-        label = st.session_state.plan_base.capitalize()  # Trial / Standard / Pro
+        label = st.session_state.plan_base.capitalize()
         st.markdown(f"**Current plan:** {label}")
 
     st.caption("Pricing: Standard $4.99/mo • Pro $9.99/mo")
@@ -838,7 +865,7 @@ with st.sidebar:
     else:
         st.success("✅ You are on the Pro plan.")
 
-    # --- Mission controls below are unchanged ---
+    # --- Mission controls ---
     st.header("Preset & Validation")
     use_genesat = st.checkbox("Load GeneSat-1 defaults", True)
     auto_cal = st.checkbox("Calibrate avg power to GeneSat target (~4.5 W)", True)
@@ -890,11 +917,12 @@ if auto_cal:
         cal_factor = target_avgW / P_now
 
 # =========================
-# Tabs  (unchanged except for new debris feature in Drag tab)
+# Tabs
 # =========================
-tab_orbit, tab_power, tab_thermal, tab_drag, tab_adv, tab_io = st.tabs([
+tab_orbit, tab_power, tab_verify, tab_thermal, tab_drag, tab_adv, tab_io = st.tabs([
     "3D + Ground Track (aligned)",
     "Power",
+    "Verification",
     "Thermal",
     "Drag & Debris",
     "Advanced Analysis (Pro)",
@@ -904,6 +932,12 @@ tab_orbit, tab_power, tab_thermal, tab_drag, tab_adv, tab_io = st.tabs([
 # --- TAB 1: ORBIT ---
 with tab_orbit:
     st.subheader("3D Orbit (ECI) + Aligned Ground Track (ECEF)")
+
+    st.markdown(
+        '<span class="badge-heritage">Model anchored to GeneSat-1 / PharmaSat / O/OREOS flight data</span>',
+        unsafe_allow_html=True,
+    )
+
     t, u, x_km, y_km, z_km = sim.orbit_eci(N=720)
     lon_deg, lat_deg = sim.ground_track_from_eci(t, x_km, y_km, z_km)
     eclipsed = eclipse_mask_from_vec(x_km, y_km, z_km, sim.S)
@@ -1114,7 +1148,238 @@ with tab_power:
     elif len(eod_soc):
         st.success("Battery SoC projection looks acceptable.")
 
-# --- TAB 3: THERMAL ---
+# --- TAB 3: VERIFICATION (heritage missions) ---
+with tab_verify:
+    st.subheader("Verification — Consistency with NASA Ames Bio CubeSats")
+
+    st.markdown(
+        """
+        This tab compares CATSIM's internal models against published parameters for
+        NASA Ames biology/astrobiology CubeSats:
+
+        - **GeneSat-1** (E. coli biosensor mission)
+        - **PharmaSat** (yeast drug dose-response mission)
+        - **O/OREOS** (SESLO astrobiology mission)
+
+        For the cleanest GeneSat-1 comparison, turn on **“Load GeneSat-1 defaults”** in the sidebar.
+        """
+    )
+
+    # Dedicated heritage configurations
+    sim_gen = CubeSatSim(
+        altitude_km=GENESAT_DEFAULTS["altitude_km"],
+        incl_deg=GENESAT_DEFAULTS["incl_deg"],
+        mass_kg=GENESAT_DEFAULTS["mass_kg"],
+        Cd=GENESAT_DEFAULTS["Cd"],
+        panel_area_m2=GENESAT_DEFAULTS["panel_area_m2"],
+        panel_eff=GENESAT_DEFAULTS["panel_eff"],
+        absorptivity=GENESAT_DEFAULTS["absorptivity"],
+        emissivity=GENESAT_DEFAULTS["emissivity"],
+        beta_deg=0.0,
+    )
+
+    sim_pharma = CubeSatSim(
+        altitude_km=PHARMASAT_DEFAULTS["altitude_km"],
+        incl_deg=PHARMASAT_DEFAULTS["incl_deg"],
+        mass_kg=PHARMASAT_DEFAULTS["mass_kg"],
+        Cd=PHARMASAT_DEFAULTS["Cd"],
+        panel_area_m2=PHARMASAT_DEFAULTS["panel_area_m2"],
+        panel_eff=PHARMASAT_DEFAULTS["panel_eff"],
+        absorptivity=PHARMASAT_DEFAULTS["absorptivity"],
+        emissivity=PHARMASAT_DEFAULTS["emissivity"],
+        beta_deg=0.0,
+    )
+
+    sim_ooreos = CubeSatSim(
+        altitude_km=OOREOS_DEFAULTS["altitude_km"],
+        incl_deg=OOREOS_DEFAULTS["incl_deg"],
+        mass_kg=OOREOS_DEFAULTS["mass_kg"],
+        Cd=OOREOS_DEFAULTS["Cd"],
+        panel_area_m2=OOREOS_DEFAULTS["panel_area_m2"],
+        panel_eff=OOREOS_DEFAULTS["panel_eff"],
+        absorptivity=OOREOS_DEFAULTS["absorptivity"],
+        emissivity=OOREOS_DEFAULTS["emissivity"],
+        beta_deg=0.0,
+    )
+
+    # Model predictions (body-spin)
+    period_gen_min = sim_gen.T_orbit / 60.0
+    period_pharma_min = sim_pharma.T_orbit / 60.0
+    period_ooreos_min = sim_ooreos.T_orbit / 60.0
+
+    oap_gen_W = sim_gen.avg_power("body-spin", sim_gen.A_panel, sim_gen.eta)
+    oap_pharma_W = sim_pharma.avg_power("body-spin", sim_pharma.A_panel, sim_pharma.eta)
+    oap_ooreos_W = sim_ooreos.avg_power("body-spin", sim_ooreos.A_panel, sim_ooreos.eta)
+
+    refG = GENESAT_REF
+    refP = PHARMASAT_REF
+    refO = OOREOS_REF
+
+    period_current_min = sim.T_orbit / 60.0
+    oap_current_W = sim.avg_power(attitude, sim.A_panel, sim.eta) * cal_factor * elec_derate
+
+    def rel_err(model_val, ref_val):
+        if ref_val == 0 or ref_val is None:
+            return ""
+        return f"{(model_val - ref_val) / ref_val * 100.0:.1f} %"
+
+    st.markdown("### Heritage mission comparison (orbital + power)")
+    rows = [
+        # GeneSat-1
+        {
+            "Mission": "GeneSat-1",
+            "Quantity": "Average altitude (km)",
+            "Reference": refG["alt_km"],
+            "CATSIM config / model": GENESAT_DEFAULTS["altitude_km"],
+            "Rel. diff vs ref": rel_err(GENESAT_DEFAULTS["altitude_km"], refG["alt_km"]),
+        },
+        {
+            "Mission": "GeneSat-1",
+            "Quantity": "Inclination (deg)",
+            "Reference": refG["inc_deg"],
+            "CATSIM config / model": GENESAT_DEFAULTS["incl_deg"],
+            "Rel. diff vs ref": rel_err(GENESAT_DEFAULTS["incl_deg"], refG["inc_deg"]),
+        },
+        {
+            "Mission": "GeneSat-1",
+            "Quantity": "Orbital period (min)",
+            "Reference": refG["period_min"],
+            "CATSIM config / model": period_gen_min,
+            "Rel. diff vs ref": rel_err(period_gen_min, refG["period_min"]),
+        },
+        {
+            "Mission": "GeneSat-1",
+            "Quantity": "Launch mass (kg)",
+            "Reference": refG["mass_kg"],
+            "CATSIM config / model": GENESAT_DEFAULTS["mass_kg"],
+            "Rel. diff vs ref": rel_err(GENESAT_DEFAULTS["mass_kg"], refG["mass_kg"]),
+        },
+        {
+            "Mission": "GeneSat-1",
+            "Quantity": "Orbit-avg power (W)",
+            "Reference": refG["oap_W"],
+            "CATSIM config / model": oap_gen_W,
+            "Rel. diff vs ref": rel_err(oap_gen_W, refG["oap_W"]),
+        },
+
+        # PharmaSat
+        {
+            "Mission": "PharmaSat",
+            "Quantity": "Average altitude (km)",
+            "Reference": refP["alt_km"],
+            "CATSIM config / model": PHARMASAT_DEFAULTS["altitude_km"],
+            "Rel. diff vs ref": rel_err(PHARMASAT_DEFAULTS["altitude_km"], refP["alt_km"]),
+        },
+        {
+            "Mission": "PharmaSat",
+            "Quantity": "Inclination (deg)",
+            "Reference": refP["inc_deg"],
+            "CATSIM config / model": PHARMASAT_DEFAULTS["incl_deg"],
+            "Rel. diff vs ref": rel_err(PHARMASAT_DEFAULTS["incl_deg"], refP["inc_deg"]),
+        },
+        {
+            "Mission": "PharmaSat",
+            "Quantity": "Orbital period (min)",
+            "Reference": refP["period_min"],
+            "CATSIM config / model": period_pharma_min,
+            "Rel. diff vs ref": rel_err(period_pharma_min, refP["period_min"]),
+        },
+        {
+            "Mission": "PharmaSat",
+            "Quantity": "Launch mass (kg)",
+            "Reference": refP["mass_kg"],
+            "CATSIM config / model": PHARMASAT_DEFAULTS["mass_kg"],
+            "Rel. diff vs ref": rel_err(PHARMASAT_DEFAULTS["mass_kg"], refP["mass_kg"]),
+        },
+        {
+            "Mission": "PharmaSat",
+            "Quantity": "Orbit-avg power (W)",
+            "Reference": refP["oap_W"],
+            "CATSIM config / model": oap_pharma_W,
+            "Rel. diff vs ref": rel_err(oap_pharma_W, refP["oap_W"]),
+        },
+
+        # O/OREOS
+        {
+            "Mission": "O/OREOS",
+            "Quantity": "Average altitude (km)",
+            "Reference": refO["alt_km"],
+            "CATSIM config / model": OOREOS_DEFAULTS["altitude_km"],
+            "Rel. diff vs ref": rel_err(OOREOS_DEFAULTS["altitude_km"], refO["alt_km"]),
+        },
+        {
+            "Mission": "O/OREOS",
+            "Quantity": "Inclination (deg)",
+            "Reference": refO["inc_deg"],
+            "CATSIM config / model": OOREOS_DEFAULTS["incl_deg"],
+            "Rel. diff vs ref": rel_err(OOREOS_DEFAULTS["incl_deg"], refO["inc_deg"]),
+        },
+        {
+            "Mission": "O/OREOS",
+            "Quantity": "Orbital period (min)",
+            "Reference": refO["period_min"],
+            "CATSIM config / model": period_ooreos_min,
+            "Rel. diff vs ref": rel_err(period_ooreos_min, refO["period_min"]),
+        },
+        {
+            "Mission": "O/OREOS",
+            "Quantity": "Launch mass (kg)",
+            "Reference": refO["mass_kg"],
+            "CATSIM config / model": OOREOS_DEFAULTS["mass_kg"],
+            "Rel. diff vs ref": rel_err(OOREOS_DEFAULTS["mass_kg"], refO["mass_kg"]),
+        },
+        {
+            "Mission": "O/OREOS",
+            "Quantity": "Orbit-avg power (W)",
+            "Reference": refO["oap_W"],
+            "CATSIM config / model": oap_ooreos_W,
+            "Rel. diff vs ref": rel_err(oap_ooreos_W, refO["oap_W"]),
+        },
+    ]
+
+    df_verify = pd.DataFrame(rows)
+    st.dataframe(df_verify, use_container_width=True)
+
+    st.markdown("### Your current run vs GeneSat-1 (for context)")
+    df_current = pd.DataFrame([
+        {
+            "Quantity": "Orbital period (min)",
+            "Current CATSIM run": period_current_min,
+            "GeneSat-1 reference": refG["period_min"],
+            "Rel. diff vs ref": rel_err(period_current_min, refG["period_min"]),
+        },
+        {
+            "Quantity": "Orbit-avg power (W)",
+            "Current CATSIM run": oap_current_W,
+            "GeneSat-1 reference": refG["oap_W"],
+            "Rel. diff vs ref": rel_err(oap_current_W, refG["oap_W"]),
+        },
+    ])
+    st.dataframe(df_current, use_container_width=True)
+
+    if use_genesat:
+        st.success(
+            "You are currently using the GeneSat-1 preset. "
+            "Small relative differences in the GeneSat-1 rows indicate that CATSIM's "
+            "underlying models are consistent with published GeneSat-1 performance."
+        )
+    else:
+        st.info(
+            "You are not using the GeneSat-1 preset. "
+            "To see a closer match, enable **“Load GeneSat-1 defaults”** in the sidebar."
+        )
+
+    st.markdown(
+        """
+        #### Published references
+
+        - GeneSat-1: ~416.5 km, 40° inclination, 92.9 min period, 4.6 kg, ~4.5 W OAP  
+        - PharmaSat: ~459 km, 40.4°, 93.52 min period, 4.5 kg, ~4.5 W OAP  
+        - O/OREOS: ~630–650 km, 72°, 97.7 min period, 5.5 kg, ~4.5 W available power  
+        """
+    )
+
+# --- TAB 4: THERMAL ---
 with tab_thermal:
     st.subheader("Radiative Thermal Equilibrium (current β)")
     A_abs = st.number_input("Absorbing area A_abs (m²)", 0.001, 2.0, sim.A_panel, 0.001)
@@ -1142,7 +1407,7 @@ with tab_thermal:
         use_container_width=True
     )
 
-# --- TAB 4: DRAG & DEBRIS ---
+# --- TAB 5: DRAG & DEBRIS ---
 with tab_drag:
     st.subheader("Altitude Decay from Drag (simple mission view)")
     A_drag = st.number_input("Reference drag area (m²)", 0.001, 2.0, sim.A_panel, 0.001)
@@ -1179,7 +1444,6 @@ with tab_drag:
         ],
     )
 
-    # For now, assume circular mission orbit: sma = R_E + h
     sma_km = (R_E + altitude_km * 1000.0) / 1000.0
     ecc = 0.0
     mission_life_years = mission_days / 365.0
@@ -1215,7 +1479,7 @@ with tab_drag:
     st.markdown("#### ODAR Narrative (copy into your documentation)")
     st.text_area("ODAR Summary", odar_text, height=280)
 
-# --- TAB 5: ADVANCED (Pro-only by plan_effective) ---
+# --- TAB 6: ADVANCED (Pro-only by plan_effective) ---
 with tab_adv:
     st.markdown("## Advanced Analysis (Pro)")
     st.caption("Multi-β, multi-orbit, and envelope visualizations.")
@@ -1351,7 +1615,7 @@ with tab_adv:
         if len(alt_series_adv):
             st.metric("Final altitude (km)", f"{alt_series_adv[-1]:.1f}")
 
-# --- TAB 6: SAVE/LOAD & EXPORT (Pro-only) ---
+# --- TAB 7: SAVE/LOAD & EXPORT (Pro-only) ---
 with tab_io:
     st.subheader("Save/Load & Export (Pro)")
     st.markdown("⬇️ **Save / Load Missions & Export Data**")
