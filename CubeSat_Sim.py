@@ -6,7 +6,12 @@ import requests
 # Simple Auth0 helpers inline
 # ---------------------------
 
+# ---------------------------
+# Simple Auth0 helpers inline
+# ---------------------------
+
 def auth0_login_button():
+    """Show a 'Sign in with Auth0' link."""
     domain = st.secrets["AUTH0_DOMAIN"]
     client_id = st.secrets["AUTH0_CLIENT_ID"]
     redirect_uri = st.secrets["AUTH0_CALLBACK_URL"]
@@ -14,7 +19,7 @@ def auth0_login_button():
     auth_url = (
         f"https://{domain}/authorize?"
         + urllib.parse.urlencode({
-            "response_type": "token",
+            "response_type": "code",          # use code flow
             "client_id": client_id,
             "redirect_uri": redirect_uri,
             "scope": "openid profile email",
@@ -22,6 +27,80 @@ def auth0_login_button():
     )
 
     st.markdown(f"[Sign in with Auth0]({auth_url})")
+
+
+def auth0_handle_callback():
+    """
+    If Auth0 has redirected back with ?code=..., trade that for tokens
+    and store the user info in session_state.
+    """
+    params = st.query_params
+
+    code = params.get("code")
+    if isinstance(code, list):
+        code = code[0]
+
+    if not code:
+        return  # no callback yet
+
+    domain = st.secrets["AUTH0_DOMAIN"]
+    client_id = st.secrets["AUTH0_CLIENT_ID"]
+    client_secret = st.secrets["AUTH0_CLIENT_SECRET"]
+    redirect_uri = st.secrets["AUTH0_CALLBACK_URL"]
+
+    token_url = f"https://{domain}/oauth/token"
+    data = {
+        "grant_type": "authorization_code",
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "code": code,
+        "redirect_uri": redirect_uri,
+    }
+
+    resp = requests.post(token_url, data=data)
+    resp.raise_for_status()
+    tokens = resp.json()
+    id_token = tokens["id_token"]
+
+    # For now, decode without strict verification (OK for dev)
+    claims = jwt.get_unverified_claims(id_token)
+
+    st.session_state["user"] = {
+        "sub": claims.get("sub"),
+        "email": claims.get("email"),
+        "name": claims.get("name"),
+        "picture": claims.get("picture"),
+    }
+    st.session_state["id_token"] = id_token
+
+    # Clear query params so refresh doesn't re-process the code
+    st.query_params.clear()
+
+
+def auth0_is_logged_in():
+    """Check if user is logged in; if not, see if there's a callback to process."""
+    if "user" in st.session_state:
+        return True
+
+    # See if Auth0 just redirected back with a code
+    auth0_handle_callback()
+    return "user" in st.session_state
+
+
+# Backwards-compatible wrappers so existing code still works
+def login_button():
+    auth0_login_button()
+
+
+def get_user():
+    """
+    Return the current user dict, or None.
+    Your existing 'if not get_user()' checks will now work.
+    """
+    if auth0_is_logged_in():
+        return st.session_state.get("user")
+    return None
+
 
 def auth0_is_logged_in():
     # NOTE: This is a very naive placeholder. For now we'll just say "not logged in",
