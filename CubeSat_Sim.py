@@ -487,24 +487,31 @@ st.session_state.trial_end = trial_end.isoformat()
 
 
 # =========================
-# Sidebar controls (Account + Plan + Mission)
+# Sidebar controls (including plan UI)
 # =========================
 with st.sidebar:
+    # ---------- ACCOUNT ----------
     st.header("Account")
-    # If you want to keep the stub for now, leave this block as-is.
-    # Once you're fully on Auth0, you can remove this and just show the Auth0 user.
-    if st.session_state.user is None:
-        email = st.text_input("Email (not wired yet)", "")
-        if st.button("Sign in (stub)"):
-            st.session_state.user = {"email": email or "guest@example.com"}
-    else:
-        st.success(f"Signed in as {st.session_state.user['email']}")
-        if st.button("Sign out"):
-            st.session_state.user = None
 
+    # Use Auth0 user from the top of the file
+    # (you already did: user = get_user())
+    auth_email = (user or {}).get("email", "unknown")
+    auth_name = (user or {}).get("name", "")
+    auth_pic = (user or {}).get("picture")
+
+    if auth_pic:
+        st.image(auth_pic, width=64)
+    if auth_name:
+        st.markdown(f"**{auth_name}**")
+    st.caption(auth_email)
+
+    # If you still want the old stub login for offline testing,
+    # you can comment it back in, but you don't need it with Auth0 working.
+
+    # ---------- PLAN & BILLING ----------
     st.header("Plan & Billing")
 
-    # --- DEV-ONLY PLAN TOGGLE ---
+    # 🔧 DEV-ONLY PLAN TOGGLE
     if DEV_MODE:
         st.markdown(
             "<div style='font-size:0.75rem; color:#888;'>Dev only: simulate subscription</div>",
@@ -518,6 +525,7 @@ with st.sidebar:
         )
 
         if dev_choice != "Use real plan":
+            # Directly override plan_base in session_state
             if dev_choice == "Trial":
                 st.session_state.plan_base = "trial"
                 st.session_state.trial_start = dt.date.today().isoformat()
@@ -526,10 +534,11 @@ with st.sidebar:
             else:
                 st.session_state.plan_base = "pro"
 
-            # Rerun so the new plan_base feeds into plan_effective & gating
+            # Recompute effective plan immediately
             st.experimental_rerun()
 
-    # --- Existing Plan UI (unchanged) ---
+    # --- Your existing plan UI, kept almost identical ---
+
     if st.session_state.in_trial:
         st.markdown(f"**Current plan:** 🧪 Trial (Standard) — ends {st.session_state.trial_end}")
         st.caption(
@@ -537,7 +546,7 @@ with st.sidebar:
             "Pro features (Advanced Analysis, Save/Load & Export) require a Pro subscription."
         )
     else:
-        label = st.session_state.plan_base.capitalize()  # trial / standard / pro
+        label = st.session_state.plan_base.capitalize()  # Trial / Standard / Pro
         st.markdown(f"**Current plan:** {label}")
 
     st.caption("Pricing: Standard $4.99/mo • Pro $9.99/mo")
