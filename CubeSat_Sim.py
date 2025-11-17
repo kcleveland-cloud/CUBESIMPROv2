@@ -249,6 +249,8 @@ EARTH_IR = 237.0
 ALBEDO = 0.3
 DAY_SEC = 86400.0
 
+# For debris lifetime modeling
+R_EARTH_KM = R_E / 1000.0
 
 def clamp_angle_deg(a):
     return (a + 180.0) % 360.0 - 180.0
@@ -461,6 +463,275 @@ class CubeSatSim:
 
 
 # =========================
+# NASA debris lifetime model + ODAR helpers
+# =========================
+
+# Reference lifetime table for a "typical" smallsat ballistic coefficient (~50 kg/m^2)
+# (perigee altitude [km], lifetime [years])
+LIFETIME_REF_TABLE = [
+    (350, 0.10),
+    (375, 0.20),
+    (400, 0.50),
+    (425, 1.0),
+    (450, 1.8),
+    (475, 3.0),
+    (500, 4.5),
+    (525, 7.0),
+    (550, 10.0),
+    (575, 17.0),
+    (600, 25.0),
+    (625, 40.0),
+    (650, 60.0),
+    (675, 100.0),
+    (700, 150.0),
+    (725, 250.0),
+    (750, 400.0),
+    (775, 650.0),
+    (800, 900.0),
+]
+
+BC_REF_KG_M2 = 50.0  # reference ballistic coefficient
+
+
+def _interp_lifetime_base(perigee_alt_km: float) -> float:
+    """
+    Interpolate baseline lifetime (years) vs perigee altitude using
+    a log-space interpolation between table points.
+    """
+    import math
+
+    # Below lowest point: extrapolate using first segment
+    if perigee_alt_km <= LIFETIME_REF_TABLE[0][0]:
+        h0, t0 = LIFETIME_REF_TABLE[0]
+        h1, t1 = LIFETIME_REF_TABLE[1]
+        logt0 = math.log(t0)
+        logt1 = math.log(t1)
+        slope = (logt1 - logt0) / (h1 - h0)
+        logt = logt0 + slope * (perigee_alt_km - h0)
+        return max(math.exp(logt), 0.01)
+
+    # Above highest point: extrapolate using last segment
+    if perigee_alt_km >= LIFETIME_REF_TABLE[-1][0]:
+        h0, t0 = LIFETIME_REF_TABLE[-2]
+        h1, t1 = LIFETIME_REF_TABLE[-1]
+        logt0 = math.log(t0)
+        logt1 = math.log(t1)
+        slope = (logt1 - logt0) / (h1 - h0)
+        logt = logt1 + slope * (perigee_alt_km - h1)
+        return math.exp(logt)
+
+    # Inside table: find bracket and interpolate
+    for (h0, t0), (h1, t1) in zip(LIFETIME_REF_TABLE[:-1], LIFETIME_REF_TABLE[1:]):
+        if h0 <= perigee_alt_km <= h1:
+            logt0 = math.log(t0)
+            logt1 = math.log(t1)
+            f = (perigee_alt_km - h0) / (h1 - h0)
+            logt = logt0 + f * (logt1 - logt0)
+            return math.exp(logt)
+
+    # Fallback
+    return 25.0
+
+
+def estimate_orbital_lifetime_years(
+    perigee_alt_km: float,
+    mass_kg: float | None = None,
+    cross_section_m2: float | None = None,
+    cd: float = 2.2,
+    solar_activity_scale: float = 1.0,
+) -> float:
+    """
+    Estimate post-mission orbital lifetime in years (LEO).
+
+    - perigee_alt_km: perigee altitude [km]
+    - mass_kg, cross_section_m2, cd: used to compute ballistic coefficient.
+      If not provided, assume a reference smallsat BC (~50 kg/m^2).
+    - solar_activity_scale:
+        < 1.0  -> low solar activity (longer lifetime)
+          1.0  -> nominal
+        > 1.0  -> high solar activity (shorter lifetime)
+    """
+    import math
+
+    if perigee_alt_km < 150.0:
+        return 0.0  # essentially immediate reentry
+
+    base_life = _interp_lifetime_base(perigee_alt_km)  # ref BC, nominal solar
+
+    # Ballistic coefficient scaling
+    if mass_kg is not None and cross_section_m2 is not None and cross_section_m2 > 0.0:
+        bc = mass_kg / (cd * cross_section_m2)  # kg/m^2
+        bc_scale = bc / BC_REF_KG_M2
+    else:
+        bc_scale = 1.0
+
+    # Solar activity scaling (higher activity -> more drag -> shorter lifetime)
+    if solar_activity_scale <= 0.0:
+        solar_activity_scale = 1.0
+
+    lifetime = base_life * bc_scale / solar_activity_scale
+    return lifetime
+
+
+def nasa_debris_compliance_check(
+    sma_km: float,
+    ecc: float,
+    mass_kg: float | None = None,
+    cross_section_m2: float | None = None,
+    cd: float = 2.2,
+    solar_activity_scale: float = 1.0,
+) -> dict:
+    """
+    Evaluate NASA 25-year post-mission disposal compliance (LEO).
+
+    Returns:
+        {
+            "perigee_alt_km": ...,
+            "lifetime_years": ...,
+            "status": "Compliant" | "Borderline" | "Not Compliant",
+            "emoji": "✅/⚠️/❌",
+            "note": "...",
+        }
+    """
+    # Perigee radius and altitude
+    r_p_km = sma_km * (1.0 - ecc)
+    h_p_km = r_p_km - R_EARTH_KM
+
+    lifetime_years = estimate_orbital_lifetime_years(
+        perigee_alt_km=h_p_km,
+        mass_kg=mass_kg,
+        cross_section_m2=cross_section_m2,
+        cd=cd,
+        solar_activity_scale=solar_activity_scale,
+    )
+
+    # NASA 25-year guideline
+    if lifetime_years <= 25.0:
+        status = "Compliant"
+        emoji = "✅"
+        note = (
+            "Estimated post-mission orbital lifetime is ≤ 25 years, consistent with "
+            "NASA's LEO post-mission disposal guideline (NPR 8715.6 / NASA-STD-8719.14)."
+        )
+    elif 25.0 < lifetime_years <= 35.0:
+        status = "Borderline"
+        emoji = "⚠️"
+        note = (
+            "Estimated lifetime is slightly above 25 years. Compliance will depend on "
+            "detailed atmospheric modeling, ballistic coefficient, and solar cycle "
+            "assumptions; an active disposal strategy may still be required."
+        )
+    else:
+        status = "Not Compliant"
+        emoji = "❌"
+        note = (
+            "Estimated post-mission orbital lifetime significantly exceeds 25 years. "
+            "NASA debris mitigation policy would typically require an active disposal "
+            "strategy (e.g., deorbit burn, drag augmentation device, or lower disposal orbit)."
+        )
+
+    return {
+        "perigee_alt_km": h_p_km,
+        "lifetime_years": lifetime_years,
+        "status": status,
+        "emoji": emoji,
+        "note": note,
+    }
+
+
+def generate_odar_summary_text(
+    mission_name: str,
+    sma_km: float,
+    ecc: float,
+    inc_deg: float | None,
+    mass_kg: float | None,
+    cross_section_m2: float | None,
+    mission_life_years: float | None,
+    disposal_mode: str,
+    compliance_result: dict,
+) -> str:
+    """
+    Generate an ODAR-style narrative for LEO post-mission disposal.
+
+    Args:
+        mission_name: e.g., "CATSIM Demo CubeSat"
+        sma_km, ecc: orbit elements at end-of-mission / disposal orbit
+        inc_deg: inclination [deg] (optional)
+        mass_kg, cross_section_m2: spacecraft properties (optional)
+        mission_life_years: planned operational life (optional)
+        disposal_mode: short description, e.g.
+            - "Natural decay from mission orbit"
+            - "Propulsive deorbit to lower circular orbit"
+            - "Drag augmentation device deployment"
+        compliance_result: output of nasa_debris_compliance_check()
+    """
+    h_p = compliance_result["perigee_alt_km"]
+    t_life = compliance_result["lifetime_years"]
+    status = compliance_result["status"]
+
+    inc_str = f" at {inc_deg:.1f}° inclination" if inc_deg is not None else ""
+    mass_str = f" with a dry mass of ~{mass_kg:.1f} kg" if mass_kg is not None else ""
+    area_str = (
+        f" and an estimated average cross-sectional area of ~{cross_section_m2:.3f} m²"
+        if cross_section_m2 is not None
+        else ""
+    )
+    life_str = (
+        f" The planned operational lifetime is approximately {mission_life_years:.1f} years."
+        if mission_life_years is not None
+        else ""
+    )
+
+    disposal_sentence = (
+        f" At end-of-mission, the spacecraft will be left in (or maneuvered to) an orbit "
+        f"with a perigee altitude of approximately {h_p:.0f} km, following the disposal mode: "
+        f"{disposal_mode}."
+    )
+
+    if status == "Compliant":
+        compliance_sentence = (
+            f" Using the CATSIM orbital lifetime model, which is calibrated to typical "
+            f"small spacecraft ballistic coefficients and standard atmospheric references, "
+            f"the post-mission orbital lifetime is estimated to be about {t_life:.1f} years. "
+            f"This is less than the 25-year guideline for LEO post-mission disposal established "
+            f"in NASA NPR 8715.6 and NASA-STD-8719.14; therefore, the mission is expected to be "
+            f"**compliant** with NASA's LEO orbital debris mitigation requirements for post-mission disposal."
+        )
+    elif status == "Borderline":
+        compliance_sentence = (
+            f" Using the CATSIM orbital lifetime model, the post-mission orbital lifetime is "
+            f"estimated to be about {t_life:.1f} years, which is slightly above the 25-year "
+            f"guideline in NASA NPR 8715.6 and NASA-STD-8719.14. Compliance will depend on the "
+            f"actual on-orbit ballistic coefficient and solar activity cycle. A margin analysis "
+            f"and/or an active disposal maneuver is recommended to ensure the lifetime remains "
+            f"within 25 years under conservative assumptions."
+        )
+    else:
+        compliance_sentence = (
+            f" Using the CATSIM orbital lifetime model, the post-mission orbital lifetime is "
+            f"estimated to be about {t_life:.1f} years, which significantly exceeds the 25-year "
+            f"guideline in NASA NPR 8715.6 and NASA-STD-8719.14. As currently defined, this "
+            f"mission would **not be compliant** with NASA's LEO post-mission disposal "
+            f"requirements. An active disposal strategy (e.g., perigee-lowering burn or drag "
+            f"augmentation device) will be required to reduce the orbital lifetime below 25 years."
+        )
+
+    intro = (
+        f"{mission_name} is a small satellite mission in low Earth orbit with an end-of-mission "
+        f"orbit characterized by a semi-major axis of approximately {sma_km:.0f} km and an "
+        f"eccentricity of {ecc:.4f}{inc_str}.{mass_str}{area_str}{life_str}"
+    )
+
+    closing = (
+        " These estimates are intended for design and trade studies and should be validated "
+        "against an approved orbital debris assessment tool (e.g., NASA DAS) during formal "
+        "mission reviews."
+    )
+
+    return intro + "\n\n" + disposal_sentence + "\n\n" + compliance_sentence + "\n\n" + closing
+
+
+# =========================
 # Pricing model & plan state
 # =========================
 # Base plan in DB terms: 'trial' | 'standard' | 'pro'
@@ -493,8 +764,6 @@ with st.sidebar:
     # ---------- ACCOUNT ----------
     st.header("Account")
 
-    # Use Auth0 user from the top of the file
-    # (you already did: user = get_user())
     auth_email = (user or {}).get("email", "unknown")
     auth_name = (user or {}).get("name", "")
     auth_pic = (user or {}).get("picture")
@@ -505,14 +774,10 @@ with st.sidebar:
         st.markdown(f"**{auth_name}**")
     st.caption(auth_email)
 
-    # If you still want the old stub login for offline testing,
-    # you can comment it back in, but you don't need it with Auth0 working.
-
     # ---------- PLAN & BILLING ----------
     st.header("Plan & Billing")
 
     # 🔧 DEV-ONLY PLAN TOGGLE
-        # 🔧 DEV-ONLY PLAN TOGGLE
     if DEV_MODE:
         st.markdown(
             "<div style='font-size:0.75rem; color:#888;'>Dev only: simulate subscription</div>",
@@ -539,11 +804,9 @@ with st.sidebar:
                 st.session_state.plan_base = "pro"
             # "Use real plan" means: don't override plan_base
 
-            # Optional: force immediate refresh so gating updates right away
             st.rerun()
 
-
-    # --- Your existing plan UI, kept almost identical ---
+    # --- Plan UI ---
 
     if st.session_state.in_trial:
         st.markdown(f"**Current plan:** 🧪 Trial (Standard) — ends {st.session_state.trial_end}")
@@ -574,9 +837,6 @@ with st.sidebar:
         st.caption("In production, this would redirect to Stripe Checkout.")
     else:
         st.success("✅ You are on the Pro plan.")
-
-    # ... your existing "Preset & Validation" and below stay as-is ...
-
 
     # --- Mission controls below are unchanged ---
     st.header("Preset & Validation")
@@ -630,13 +890,13 @@ if auto_cal:
         cal_factor = target_avgW / P_now
 
 # =========================
-# Tabs  (unchanged except for plan_effective gating)
+# Tabs  (unchanged except for new debris feature in Drag tab)
 # =========================
 tab_orbit, tab_power, tab_thermal, tab_drag, tab_adv, tab_io = st.tabs([
     "3D + Ground Track (aligned)",
     "Power",
     "Thermal",
-    "Drag",
+    "Drag & Debris",
     "Advanced Analysis (Pro)",
     "Save/Load & Export (Pro)"
 ])
@@ -882,7 +1142,7 @@ with tab_thermal:
         use_container_width=True
     )
 
-# --- TAB 4: DRAG ---
+# --- TAB 4: DRAG & DEBRIS ---
 with tab_drag:
     st.subheader("Altitude Decay from Drag (simple mission view)")
     A_drag = st.number_input("Reference drag area (m²)", 0.001, 2.0, sim.A_panel, 0.001)
@@ -898,6 +1158,62 @@ with tab_drag:
         ),
         use_container_width=True
     )
+
+    # ===== NASA orbital debris compliance & ODAR text =====
+    st.markdown("### NASA Orbital Debris Compliance (25-year rule)")
+
+    solar_choice = st.radio(
+        "Solar activity assumption (for debris lifetime)",
+        ["Low", "Nominal", "High"],
+        index=1,
+        horizontal=True,
+    )
+    solar_scale = {"Low": 0.7, "Nominal": 1.0, "High": 1.4}[solar_choice]
+
+    disposal_mode = st.selectbox(
+        "End-of-mission disposal strategy",
+        [
+            "Natural decay from mission orbit",
+            "Propulsive deorbit to lower circular orbit",
+            "Drag augmentation device deployment",
+        ],
+    )
+
+    # For now, assume circular mission orbit: sma = R_E + h
+    sma_km = (R_E + altitude_km * 1000.0) / 1000.0
+    ecc = 0.0
+    mission_life_years = mission_days / 365.0
+
+    od_result = nasa_debris_compliance_check(
+        sma_km=sma_km,
+        ecc=ecc,
+        mass_kg=mass_kg,
+        cross_section_m2=panel_area,
+        cd=Cd,
+        solar_activity_scale=solar_scale,
+    )
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Perigee altitude", f"{od_result['perigee_alt_km']:.0f} km")
+    c2.metric("Est. post-mission lifetime", f"{od_result['lifetime_years']:.1f} years")
+    c3.metric("Compliance status", f"{od_result['emoji']} {od_result['status']}")
+
+    st.markdown(f"**Interpretation:** {od_result['note']}")
+
+    odar_text = generate_odar_summary_text(
+        mission_name="CATSIM Mission",
+        sma_km=sma_km,
+        ecc=ecc,
+        inc_deg=incl_deg,
+        mass_kg=mass_kg,
+        cross_section_m2=panel_area,
+        mission_life_years=mission_life_years,
+        disposal_mode=disposal_mode,
+        compliance_result=od_result,
+    )
+
+    st.markdown("#### ODAR Narrative (copy into your documentation)")
+    st.text_area("ODAR Summary", odar_text, height=280)
 
 # --- TAB 5: ADVANCED (Pro-only by plan_effective) ---
 with tab_adv:
@@ -958,7 +1274,7 @@ with tab_adv:
             load = cons_W
             if gen >= load:
                 P_surplus = gen - load
-                if P_chg_max is not None:
+                if 'P_chg_max' in locals() and P_chg_max is not None:
                     P_surplus = min(P_surplus, P_chg_max)
                 dE_Wh = (P_surplus * eta_chg) * dt_adv / 3600.0
                 soc_wh_adv = min(soc_wh_adv + dE_Wh, batt_Wh)
