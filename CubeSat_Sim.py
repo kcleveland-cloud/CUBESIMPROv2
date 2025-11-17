@@ -28,9 +28,7 @@ def auth0_login_button():
 
     st.markdown(f"[Sign in with Auth0]({auth_url})")
 
-with st.sidebar:
-    if user:
-        st.write(f"Signed in as **{user['email']}**")
+
 
 
 def auth0_handle_callback():
