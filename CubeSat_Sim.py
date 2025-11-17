@@ -6,9 +6,9 @@ from jose import jwt
 # =========================
 # Auth0 config (temporary)
 # =========================
-AUTH0_DOMAIN = "dev-qwn3runpmc616as6.us.auth0.com"
-AUTH0_CLIENT_ID = "XvRZKwcHlcToRYGMMwnZiNjLnNzJmUmU"
-AUTH0_CLIENT_SECRET = "YOUR_REAL_CLIENT_SECRET_HERE"
+AUTH0_DOMAIN = "dev-i3z871lvgt1gt4jh.us.auth0.com"
+AUTH0_CLIENT_ID = "Rqnf32daO3Gpxf7rruWqR3Gx87emIErv"
+AUTH0_CLIENT_SECRET = "cKmyi0R1OVWiPaD-bWoVvLC2wQnni6N58GQ_MrO3TTtfsWCSkQl-sVCZf-E7J-jo"
 AUTH0_CALLBACK_URL = "https://cubesimprov2-lt6hcgkvpdvygnwbktyqdg.streamlit.app"
 
 
