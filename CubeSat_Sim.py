@@ -1102,43 +1102,84 @@ with tab_power:
 with tab_thermal:
     st.subheader("Radiative Thermal Equilibrium (current β)")
 
-    col_inputs, col_gfx = st.columns([1, 1.2])
+    # --- Inputs and basic result ---
+    A_abs = st.number_input("Absorbing area A_abs (m²)", 0.001, 2.0, sim.A_panel, 0.001)
+    A_rad = st.number_input("Radiating area A_rad (m²)", 0.005, 2.0, 6.0 * sim.A_panel, 0.005)
+    Q_int = st.number_input("Internal dissipation Q_internal (W)", 0.0, 50.0, 0.0, 0.1)
 
-    with col_inputs:
-        A_abs = st.number_input("Absorbing area A_abs (m²)", 0.001, 2.0, sim.A_panel, 0.001)
-        A_rad = st.number_input("Radiating area A_rad (m²)", 0.005, 2.0, 6.0 * sim.A_panel, 0.005)
-        Q_int = st.number_input("Internal dissipation Q_internal (W)", 0.0, 50.0, 0.0, 0.1)
+    T_c, Qs, Qa, Qir, Qin, Qtot = sim.thermal_equilibrium(
+        A_abs=A_abs,
+        A_rad=A_rad,
+        Q_internal_W=Q_int
+    )
+    st.metric("Equilibrium temperature (°C)", f"{T_c:.2f}")
 
-        T_c, Qs, Qa, Qir, Qin, Qtot = sim.thermal_equilibrium(
-            A_abs=A_abs,
-            A_rad=A_rad,
-            Q_internal_W=Q_int
+    dfQ = pd.DataFrame([{
+        "Solar_avg_W": Qs,
+        "Albedo_W": Qa,
+        "Earth_IR_W": Qir,
+        "Internal_W": Qin,
+        "Total_abs_W": Qtot
+    }])
+
+    # --- Visuals: CubeSat rectangle + compact gauge ---
+    cube_col, gauge_col = st.columns([1, 1.4])
+
+    # Decide CubeSat color based on temperature bands
+    if T_c <= -10:
+        cube_color = "#0ea5e9"  # cold / blue
+        cube_label = "Cold regime"
+    elif T_c < 40:
+        cube_color = "#22c55e"  # nominal / green
+        cube_label = "Nominal regime"
+    else:
+        cube_color = "#ef4444"  # hot / red
+        cube_label = "Hot regime"
+
+    with cube_col:
+        st.markdown("### CubeSat body view")
+        st.markdown(
+            f"""
+            <div style="
+                display:flex;
+                flex-direction:column;
+                align-items:center;
+                justify-content:center;
+                padding-top:0.5rem;
+            ">
+              <div style="
+                  width:110px;
+                  height:170px;
+                  border-radius:20px;
+                  border:2px solid #0f172a;
+                  background:{cube_color};
+                  box-shadow:0 10px 18px rgba(15,23,42,0.35);
+              "></div>
+              <div style="
+                  margin-top:0.5rem;
+                  font-size:0.85rem;
+                  color:#6b7280;
+                  text-align:center;
+              ">
+                CubeSat body (color indicates thermal regime)<br>
+                <span style="font-weight:600;">{cube_label}</span>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
-        st.metric("Equilibrium temperature (°C)", f"{T_c:.2f}")
-
-        dfQ = pd.DataFrame([{
-            "Solar_avg_W": Qs,
-            "Albedo_W": Qa,
-            "Earth_IR_W": Qir,
-            "Internal_W": Qin,
-            "Total_abs_W": Qtot
-        }])
-        st.dataframe(dfQ, use_container_width=True)
-
-    with col_gfx:
+    with gauge_col:
         st.markdown("### Thermal gauge")
 
-        # Define a reasonable temperature range for smallsats
         temp_min = -40.0
         temp_max = 80.0
 
-        # Simple interpretation bands
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number",
             value=T_c,
             number={"suffix": " °C"},
-            title={"text": "Body temperature"},
+            title={"text": "Equilibrium body temperature"},
             gauge={
                 "axis": {"range": [temp_min, temp_max], "tickwidth": 1},
                 "bar": {"color": "#f97316"},
@@ -1149,7 +1190,7 @@ with tab_thermal:
                 ],
                 "threshold": {
                     "line": {"color": "#111827", "width": 3},
-                    "thickness": 0.8,
+                    "thickness": 0.75,
                     "value": T_c,
                 },
             },
@@ -1157,18 +1198,18 @@ with tab_thermal:
 
         fig_gauge.update_layout(
             margin=dict(l=10, r=10, t=40, b=10),
-            height=320,
+            height=260,   # smaller so it fits comfortably in the column
         )
 
         st.plotly_chart(fig_gauge, use_container_width=True)
-
         st.caption(
-            "Blue = cold, green = nominal band, red = hot. Adjust absorptivity, emissivity, "
-            "radiating area, or internal dissipation to see how the equilibrium point moves."
+            "Blue = cold, green = nominal band, red = hot. Adjust α/ε, radiating area, "
+            "or internal dissipation to see the CubeSat color and gauge move."
         )
 
-    # Existing bar plot of heat contributions (kept below the 2-column layout)
+    # --- Heat balance breakdown (kept as a full-width graphic) ---
     st.markdown("### Heat balance breakdown")
+    st.dataframe(dfQ, use_container_width=True)
     st.plotly_chart(
         px.bar(
             dfQ.melt(var_name="Component", value_name="W"),
