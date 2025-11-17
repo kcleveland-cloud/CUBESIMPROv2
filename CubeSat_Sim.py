@@ -1,11 +1,39 @@
 import streamlit as st
-from auth0_login import login_button, get_user
+import urllib.parse
+import requests
+
+# ---------------------------
+# Simple Auth0 helpers inline
+# ---------------------------
+
+def auth0_login_button():
+    domain = st.secrets["AUTH0_DOMAIN"]
+    client_id = st.secrets["AUTH0_CLIENT_ID"]
+    redirect_uri = st.secrets["AUTH0_CALLBACK_URL"]
+
+    auth_url = (
+        f"https://{domain}/authorize?"
+        + urllib.parse.urlencode({
+            "response_type": "token",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "scope": "openid profile email",
+        })
+    )
+
+    st.markdown(f"[Sign in with Auth0]({auth_url})")
+
+def auth0_is_logged_in():
+    # NOTE: This is a very naive placeholder. For now we'll just say "not logged in",
+    # so you can get past the ModuleNotFoundError. We'll wire this up properly next.
+    return False
+
 
 st.title("CATSIM — CubeSat Simulator")
 
 if not get_user():
     st.write("Please sign in to continue.")
-    login_button()
+    auth0_login_button()
     st.stop()
 
 st.success("You are logged in!")
