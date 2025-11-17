@@ -127,6 +127,14 @@ if not get_user():
     st.stop()
 
 st.success("You are logged in!")
+
+with st.sidebar:
+    st.markdown("---")
+    st.write("**Signed in as:**")
+    st.write(user["email"])
+    if user.get("name"):
+        st.write(f"({user['name']})")
+        
 # ... rest of your simulator here ...
 
 # CATSIM — CubeSat Mission Simulator
