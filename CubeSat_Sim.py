@@ -512,30 +512,36 @@ with st.sidebar:
     st.header("Plan & Billing")
 
     # 🔧 DEV-ONLY PLAN TOGGLE
+        # 🔧 DEV-ONLY PLAN TOGGLE
     if DEV_MODE:
         st.markdown(
             "<div style='font-size:0.75rem; color:#888;'>Dev only: simulate subscription</div>",
             unsafe_allow_html=True,
         )
+
+        # Radio just selects what you *want* the plan to be
         dev_choice = st.radio(
             "Simulated plan",
             ["Use real plan", "Trial", "Standard", "Pro"],
             index=0,
+            key="dev_plan_choice",
             label_visibility="collapsed",
         )
 
-        if dev_choice != "Use real plan":
-            # Directly override plan_base in session_state
+        # Button actually applies it (one-shot)
+        if st.button("Apply dev plan"):
             if dev_choice == "Trial":
                 st.session_state.plan_base = "trial"
                 st.session_state.trial_start = dt.date.today().isoformat()
             elif dev_choice == "Standard":
                 st.session_state.plan_base = "standard"
-            else:
+            elif dev_choice == "Pro":
                 st.session_state.plan_base = "pro"
+            # "Use real plan" means: don't override plan_base
 
-            # Recompute effective plan immediately
+            # Optional: force immediate refresh so gating updates right away
             st.rerun()
+
 
     # --- Your existing plan UI, kept almost identical ---
 
