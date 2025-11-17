@@ -478,7 +478,7 @@ class CubeSatSim:
         return float(T_K - 273.15), Q_solar, Q_albedo, Q_ir, float(Q_internal_W), float(Q_total)
 
 
-            def thermal_equilibrium_2node(
+    def thermal_equilibrium_2node(
         self,
         A_abs_shell=None,
         A_rad_shell=None,
