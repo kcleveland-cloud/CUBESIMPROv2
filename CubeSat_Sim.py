@@ -26,9 +26,9 @@ st.set_page_config(
 # =========================
 # Auth0 config
 # =========================
-AUTH0_DOMAIN = "dev-i3z871lvgt1gt4jh.us.auth0.com"
-AUTH0_CLIENT_ID = "Rqnf32daO3Gpxf7rruWqR3Gx87emIErv"
-AUTH0_CLIENT_SECRET = "cKmyi0R1OVWiPaD-bWoVvLC2wQnni6N58GQ_MrO3TTtfsWCSkQl-sVC2wQnni6N58GQ_MrO3TTtfsWCSkQl-sVCZf-E7J-jo"
+AUTH0_DOMAIN = "dev-qwn3runpmc616as6.us.auth0.com"
+AUTH0_CLIENT_ID = "XvRZKwcHlcToRYGMMwnZiNjLnNzJmUmU"
+AUTH0_CLIENT_SECRET = "y7Sn91jH3sR1seU5uWPJAM89BSmS-pXfPQPcfDLzt_K3Cu2fk-D0vzYnA2sE2lah"
 AUTH0_CALLBACK_URL = "https://cubesimprov2-lt6hcgkvpdvygnwbktyqdg.streamlit.app"
 
 
