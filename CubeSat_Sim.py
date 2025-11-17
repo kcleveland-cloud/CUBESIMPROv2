@@ -12,6 +12,8 @@ import plotly.graph_objects as go
 import plotly.express as px
 import datetime as dt
 
+DEV_MODE = True  # set False in production
+
 # =========================
 # Page setup
 # =========================
@@ -489,69 +491,77 @@ st.session_state.trial_end = trial_end.isoformat()
 # =========================
 with st.sidebar:
     st.header("Account")
-
-    # Show Auth0 user info
-    picture = user.get("picture")
-    if picture:
-        st.image(picture, width=64)
-    st.markdown(f"**{user.get('name', 'User')}**")
-    st.caption(user.get("email", ""))
-
-    # Optional logout link (round-trip through Auth0)
-    st.markdown(f"[Sign out]({auth0_logout_url()})")
+    # If you want to keep the stub for now, leave this block as-is.
+    # Once you're fully on Auth0, you can remove this and just show the Auth0 user.
+    if st.session_state.user is None:
+        email = st.text_input("Email (not wired yet)", "")
+        if st.button("Sign in (stub)"):
+            st.session_state.user = {"email": email or "guest@example.com"}
+    else:
+        st.success(f"Signed in as {st.session_state.user['email']}")
+        if st.button("Sign out"):
+            st.session_state.user = None
 
     st.header("Plan & Billing")
 
-    # Plan badge
-    badge_label = "Pro" if plan_effective == "pro" else "Standard"
-    if in_trial:
-        badge_label = "Trial (Standard)"
+    # --- DEV-ONLY PLAN TOGGLE ---
+    if DEV_MODE:
+        st.markdown(
+            "<div style='font-size:0.75rem; color:#888;'>Dev only: simulate subscription</div>",
+            unsafe_allow_html=True,
+        )
+        dev_choice = st.radio(
+            "Simulated plan",
+            ["Use real plan", "Trial", "Standard", "Pro"],
+            index=0,
+            label_visibility="collapsed",
+        )
 
-    badge_color = "#1d4ed8" if plan_effective == "pro" else "#6c757d"
-    st.markdown(
-        f"""
-        <div style="
-            padding: 0.35rem 0.6rem;
-            border-radius: 999px;
-            display: inline-block;
-            font-size: 0.8rem;
-            font-weight: 600;
-            background: {badge_color}20;
-            color: {badge_color};
-            border: 1px solid {badge_color};
-            margin-bottom: 0.3rem;
-        ">
-            Current plan: {badge_label}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+        if dev_choice != "Use real plan":
+            if dev_choice == "Trial":
+                st.session_state.plan_base = "trial"
+                st.session_state.trial_start = dt.date.today().isoformat()
+            elif dev_choice == "Standard":
+                st.session_state.plan_base = "standard"
+            else:
+                st.session_state.plan_base = "pro"
 
-    if in_trial:
+            # Rerun so the new plan_base feeds into plan_effective & gating
+            st.experimental_rerun()
+
+    # --- Existing Plan UI (unchanged) ---
+    if st.session_state.in_trial:
+        st.markdown(f"**Current plan:** 🧪 Trial (Standard) — ends {st.session_state.trial_end}")
         st.caption(
-            f"30-day free trial of **Standard** features. "
-            f"Trial ends on **{st.session_state.trial_end}**.\n\n"
-            "Pro features (Advanced Analysis, Save/Load & Export) are locked during trial."
+            "During your 30-day free trial you have full access to Standard features.\n\n"
+            "Pro features (Advanced Analysis, Save/Load & Export) require a Pro subscription."
         )
     else:
-        st.caption("Upgrade to Pro to unlock Advanced Analysis and Save/Load & Export.")
+        label = st.session_state.plan_base.capitalize()  # trial / standard / pro
+        st.markdown(f"**Current plan:** {label}")
 
     st.caption("Pricing: Standard $4.99/mo • Pro $9.99/mo")
 
-    if plan_effective != "pro":
+    if st.session_state.plan_base != "pro":
         st.markdown("**Upgrade options (stubbed):**")
         col_a, col_b = st.columns(2)
+
         with col_a:
             if st.button("Standard $4.99/mo"):
                 st.session_state.plan_base = "standard"
                 st.experimental_rerun()
+
         with col_b:
             if st.button("🚀 Go Pro $9.99/mo", type="primary"):
                 st.session_state.plan_base = "pro"
                 st.experimental_rerun()
-        st.caption("In production, this would redirect to Stripe Checkout / Customer Portal.")
+
+        st.caption("In production, this would redirect to Stripe Checkout.")
     else:
         st.success("✅ You are on the Pro plan.")
+
+    # ... your existing "Preset & Validation" and below stay as-is ...
+
 
     # --- Mission controls below are unchanged ---
     st.header("Preset & Validation")
