@@ -3,15 +3,31 @@ import urllib.parse
 import requests
 from jose import jwt
 
+import json
+import io
+import os
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+import plotly.express as px
+import datetime as dt
+
 # =========================
-# Auth0 config (temporary)
+# Page setup
+# =========================
+st.set_page_config(
+    page_title="CATSIM — CubeSat Mission Simulator",
+    page_icon="CATS_Logo.png",
+    layout="wide"
+)
+
+# =========================
+# Auth0 config
 # =========================
 AUTH0_DOMAIN = "dev-i3z871lvgt1gt4jh.us.auth0.com"
 AUTH0_CLIENT_ID = "Rqnf32daO3Gpxf7rruWqR3Gx87emIErv"
-AUTH0_CLIENT_SECRET = "cKmyi0R1OVWiPaD-bWoVvLC2wQnni6N58GQ_MrO3TTtfsWCSkQl-sVCZf-E7J-jo"
+AUTH0_CLIENT_SECRET = "cKmyi0R1OVWiPaD-bWoVvLC2wQnni6N58GQ_MrO3TTtfsWCSkQl-sVC2wQnni6N58GQ_MrO3TTtfsWCSkQl-sVCZf-E7J-jo"
 AUTH0_CALLBACK_URL = "https://cubesimprov2-lt6hcgkvpdvygnwbktyqdg.streamlit.app"
-
-
 
 
 # ---------------------------
@@ -20,17 +36,22 @@ AUTH0_CALLBACK_URL = "https://cubesimprov2-lt6hcgkvpdvygnwbktyqdg.streamlit.app"
 
 def auth0_login_url():
     """Build the Auth0 login URL."""
-    domain = AUTH0_DOMAIN
-    client_id = AUTH0_CLIENT_ID
-    redirect_uri = AUTH0_CALLBACK_URL
-
     params = {
         "response_type": "code",
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
+        "client_id": AUTH0_CLIENT_ID,
+        "redirect_uri": AUTH0_CALLBACK_URL,
         "scope": "openid profile email",
     }
-    return f"https://{domain}/authorize?" + urllib.parse.urlencode(params)
+    return f"https://{AUTH0_DOMAIN}/authorize?" + urllib.parse.urlencode(params)
+
+
+def auth0_logout_url():
+    """Optional: Auth0 logout URL."""
+    params = {
+        "client_id": AUTH0_CLIENT_ID,
+        "returnTo": AUTH0_CALLBACK_URL,
+    }
+    return f"https://{AUTH0_DOMAIN}/v2/logout?" + urllib.parse.urlencode(params)
 
 
 def login_button():
@@ -41,18 +62,13 @@ def login_button():
 
 def _exchange_code_for_tokens(code: str):
     """Talk to Auth0 /oauth/token to trade code for tokens."""
-    domain = AUTH0_DOMAIN
-    client_id = AUTH0_CLIENT_ID
-    client_secret = AUTH0_CLIENT_SECRET
-    redirect_uri = AUTH0_CALLBACK_URL
-
-    token_url = f"https://{domain}/oauth/token"
+    token_url = f"https://{AUTH0_DOMAIN}/oauth/token"
     data = {
         "grant_type": "authorization_code",
-        "client_id": client_id,
-        "client_secret": client_secret,
+        "client_id": AUTH0_CLIENT_ID,
+        "client_secret": AUTH0_CLIENT_SECRET,
         "code": code,
-        "redirect_uri": redirect_uri,
+        "redirect_uri": AUTH0_CALLBACK_URL,
     }
 
     resp = requests.post(token_url, data=data)
@@ -68,11 +84,9 @@ def get_user():
     2) Else, if we have ?code=... in URL -> exchange it, store user, clear params.
     3) Else return None.
     """
-    # 1. Already logged in?
     if "user" in st.session_state:
         return st.session_state["user"]
 
-    # 2. See if Auth0 sent us back with ?code=...
     params = st.experimental_get_query_params()
     code_list = params.get("code")
     if code_list:
@@ -97,59 +111,18 @@ def get_user():
             st.error(f"Auth error: {e}")
             return None
 
-    # 3. Not logged in, no callback
     return None
 
 
-user = get_user()
-if not user:
-    st.title("CATSIM — Sign in")
-    st.write("Please sign in to use the CubeSat Mission Simulator.")
-    login_button()
-    st.stop()
-
-
-
-
-
-# ... rest of your CATSIM app ...
-
-        
-# ... rest of your simulator here ...
-
-# CATSIM — CubeSat Mission Simulator
-# Cleveland Aerospace Technology Services — Davidsonville, MD
-# Pricing Model:
-#   - 30-day free trial (Standard features only)
-#   - After trial: Standard $4.99/mo, Pro $9.99/mo
-#   - Advanced Analysis + Save/Load & Export are Pro-only.
-
-import json
-import io
-import os
-import numpy as np
-import pandas as pd
-import streamlit as st
-import plotly.graph_objects as go
-import plotly.express as px
-import datetime as dt
-
 # =========================
-# Page setup & global style
+# Brand CSS
 # =========================
-st.set_page_config(
-    page_title="CATSIM — CubeSat Mission Simulator",
-    page_icon="CATS_Logo.png",  # uses your logo as favicon
-    layout="wide"
-)
-
 def inject_brand_css():
     st.markdown(
         """
         <style>
-        /* Set Streamlit's global primary color to blue */
         :root {
-            --primary-color: #1d4ed8 !important;   /* blue-700 */
+            --primary-color: #1d4ed8 !important;
             --primaryColor: #1d4ed8 !important;
         }
 
@@ -174,7 +147,6 @@ def inject_brand_css():
             color: #38bdf8;
         }
 
-        /* Make tables a bit nicer */
         .dataframe th, .dataframe td {
             font-size: 0.85rem !important;
         }
@@ -193,14 +165,14 @@ def inject_brand_css():
             color: #ffffff !important;
         }
 
-        /* SIDEBAR NON-primary buttons (e.g., Standard, Sign in) — white with blue border */
+        /* SIDEBAR non-primary buttons — white with blue border */
         div[data-testid="stSidebar"] button:not([data-testid="baseButton-primary"]) {
             background-color: #ffffff !important;
             color: #1d4ed8 !important;
             border: 1px solid #1d4ed8 !important;
         }
         div[data-testid="stSidebar"] button:not([data-testid="baseButton-primary"]):hover {
-            background-color: #eff6ff !important;  /* light blue */
+            background-color: #eff6ff !important;
             color: #1d4ed8 !important;
             border-color: #1d4ed8 !important;
         }
@@ -210,10 +182,7 @@ def inject_brand_css():
     )
 
 
-inject_brand_css()
-
-# ---- Header with Logo + Title + Nav ----
-def show_header():
+def show_header(user):
     col1, col2 = st.columns([1, 3])
     with col1:
         logo_paths = ["CATS_Logo.png", "assets/CATS_Logo.png"]
@@ -224,17 +193,21 @@ def show_header():
                 shown = True
                 break
         if not shown:
-            st.markdown("🛰️")  # fallback
+            st.markdown("🛰️")
     with col2:
+        name = user.get("name") if user else "Guest"
         st.markdown(
-            """
+            f"""
             # **CATSIM — CubeSat Mission Simulator**
             #### by Cleveland Aerospace Technology Services  
-            *Davidsonville, Maryland, USA*
+            *Davidsonville, Maryland, USA*  
+
+            <span style="font-size:0.85rem;color:#6b7280;">
+            Signed in as: <strong>{name}</strong>
+            </span>
             """,
             unsafe_allow_html=True,
         )
-    # Simple nav bar (no Pro pill here)
     st.markdown(
         """
         <div class="cats-nav">
@@ -247,81 +220,82 @@ def show_header():
     )
     st.markdown("---")
 
-show_header()
+
+# =========================
+# Auth gate
+# =========================
+user = get_user()
+if not user:
+    st.title("CATSIM — Sign in")
+    st.write("Please sign in to use the CubeSat Mission Simulator.")
+    login_button()
+    st.stop()
+
+# Logged-in path from here down
+inject_brand_css()
+show_header(user)
 
 # =========================
 # Physical constants (SI)
 # =========================
-MU = 3.986004418e14       # Earth's gravitational parameter (m^3/s^2)
-R_E = 6371e3              # Earth radius (m)
-OMEGA_E = 7.2921159e-5    # Earth rotation rate (rad/s)
-SIGMA = 5.670374419e-8    # Stefan–Boltzmann constant (W/m^2/K^4)
-SOLAR_CONST = 1366.0      # W/m^2
-EARTH_IR = 237.0          # W/m^2
-ALBEDO = 0.3              # dimensionless
+MU = 3.986004418e14
+R_E = 6371e3
+OMEGA_E = 7.2921159e-5
+SIGMA = 5.670374419e-8
+SOLAR_CONST = 1366.0
+EARTH_IR = 237.0
+ALBEDO = 0.3
 DAY_SEC = 86400.0
 
-# =========================
-# Helpers
-# =========================
+
 def clamp_angle_deg(a):
     return (a + 180.0) % 360.0 - 180.0
 
+
 def earth_view_factor(alt_m):
-    """Earth disk view factor from altitude h."""
     r = R_E + float(alt_m)
-    theta = np.arcsin(np.clip(R_E / r, -1.0, 1.0))  # Earth angular radius
+    theta = np.arcsin(np.clip(R_E / r, -1.0, 1.0))
     return (1.0 - np.cos(theta)) / 2.0
 
+
 def rho_msis_simple(h_m):
-    """Super-simple exponential atmosphere ~200–600 km band."""
     H = 60e3
     rho_200 = 2.5e-11
     h = np.maximum(h_m, 200e3)
-    return np.clip(rho_200 * np.exp(-(h - 200e3)/H), 1e-13, None)
+    return np.clip(rho_200 * np.exp(-(h - 200e3) / H), 1e-13, None)
+
 
 def eci_to_ecef_xyz(x_eci, y_eci, z_eci, t):
-    """Rotate ECI about +Z by -OMEGA_E*t to get ECEF; arrays ok."""
     cosw = np.cos(OMEGA_E * t)
     sinw = np.sin(OMEGA_E * t)
-    x_ecef =  cosw * x_eci + sinw * y_eci
+    x_ecef = cosw * x_eci + sinw * y_eci
     y_ecef = -sinw * x_eci + cosw * y_eci
-    z_ecef =  z_eci
+    z_ecef = z_eci
     return x_ecef, y_ecef, z_ecef
 
-# ---- Sun vector & eclipse with β-angle ----
+
 def sun_vector_eci(incl_rad, beta_deg):
-    """
-    Build a fixed Sun unit vector S in ECI given orbit inclination and β.
-    β is the angle between Sun vector and orbital plane (positive toward +ĥ).
-    In-plane projection aligned with +X ECI.
-    """
-    hhat = np.array([0.0, -np.sin(incl_rad), np.cos(incl_rad)])  # orbit normal
-    cb = np.cos(np.radians(beta_deg)); sb = np.sin(np.radians(beta_deg))
+    hhat = np.array([0.0, -np.sin(incl_rad), np.cos(incl_rad)])
+    cb = np.cos(np.radians(beta_deg))
+    sb = np.sin(np.radians(beta_deg))
     S = cb * np.array([1.0, 0.0, 0.0]) + sb * hhat
     S /= np.linalg.norm(S)
     return S
 
+
 def eclipse_mask_from_vec(x_km, y_km, z_km, S_vec):
-    """
-    Cylindrical shadow test with arbitrary Sun axis S_vec (unit).
-    r·S < 0   and   ||r - (r·S)S|| < R_E (km)
-    """
     r = np.vstack((x_km, y_km, z_km)).T
     S = np.asarray(S_vec, dtype=float)
     r_dot_S = r @ S
-    r_sq = np.sum(r*r, axis=1)
-    dist_ax_sq = r_sq - r_dot_S**2
-    return (r_dot_S < 0.0) & (dist_ax_sq < (R_E/1000.0)**2)
+    r_sq = np.sum(r * r, axis=1)
+    dist_ax_sq = r_sq - r_dot_S ** 2
+    return (r_dot_S < 0.0) & (dist_ax_sq < (R_E / 1000.0) ** 2)
+
 
 def eclipse_fraction_beta(alt_m, beta_deg):
-    """
-    Orbit-averaged eclipse fraction for circular orbit, cylindrical shadow with β:
-    f = (1/π) * arccos( sqrt(1 - (Re/r)^2) / cos β ), if cosβ>0 and value<1; else 0.
-    """
     r = R_E + float(alt_m)
     Re_r = np.clip(R_E / r, 0.0, 1.0)
-    root = np.sqrt(1.0 - Re_r**2)
+    root = np.sqrt(1.0 - Re_r ** 2)
     cb = np.cos(np.radians(beta_deg))
     if cb <= 0.0:
         return 0.0
@@ -330,9 +304,7 @@ def eclipse_fraction_beta(alt_m, beta_deg):
         return 0.0
     return float(np.arccos(val) / np.pi)
 
-# =========================
-# GeneSat-1 preset (validation)
-# =========================
+
 GENESAT_DEFAULTS = dict(
     altitude_km=460.0,
     incl_deg=40.0,
@@ -345,9 +317,7 @@ GENESAT_DEFAULTS = dict(
     target_avg_power_W=4.5
 )
 
-# =========================
-# Core simulator
-# =========================
+
 class CubeSatSim:
     def __init__(self, altitude_km, incl_deg, mass_kg, Cd, panel_area_m2, panel_eff, absorptivity, emissivity, beta_deg=0.0):
         self.alt_km = float(altitude_km)
@@ -363,10 +333,10 @@ class CubeSatSim:
         self.eps = float(emissivity)
 
         self.r = R_E + self.h
-        self.T_orbit = 2*np.pi*np.sqrt(self.r**3/MU)   # s
-        self.n = 2*np.pi/self.T_orbit                  # rad/s
-        self.v = np.sqrt(MU/self.r)                    # m/s
-        self.VF = earth_view_factor(self.h)            # Earth view factor
+        self.T_orbit = 2 * np.pi * np.sqrt(self.r ** 3 / MU)
+        self.n = 2 * np.pi / self.T_orbit
+        self.v = np.sqrt(MU / self.r)
+        self.VF = earth_view_factor(self.h)
 
         self.S = sun_vector_eci(self.i, self.beta_deg)
 
@@ -377,7 +347,6 @@ class CubeSatSim:
     def eclipse_fraction(self):
         return eclipse_fraction_beta(self.h, self.beta_deg)
 
-    # ---------- Orbit ----------
     def orbit_eci(self, N=720):
         t = np.linspace(0.0, self.T_orbit, N, endpoint=False)
         u = self.n * t
@@ -388,7 +357,6 @@ class CubeSatSim:
         return t, u, x, y, z
 
     def long_orbit_eci(self, num_orbits=10, N_per_orbit=720):
-        """Multi-orbit trajectory for density maps etc."""
         total_pts = int(num_orbits * N_per_orbit)
         t = np.linspace(0.0, num_orbits * self.T_orbit, total_pts, endpoint=False)
         u = self.n * t
@@ -404,11 +372,10 @@ class CubeSatSim:
         z_m = z_eci_km * 1000.0
         x_ecef, y_ecef, z_ecef = eci_to_ecef_xyz(x_m, y_m, z_m, t)
         lon = np.degrees(np.arctan2(y_ecef, x_ecef))
-        lat = np.degrees(np.arcsin(z_ecef / np.sqrt(x_ecef**2 + y_ecef**2 + z_ecef**2)))
+        lat = np.degrees(np.arcsin(z_ecef / np.sqrt(x_ecef ** 2 + y_ecef ** 2 + z_ecef ** 2)))
         lon = clamp_angle_deg(lon)
         return lon, lat
 
-    # ---------- Attitude & power ----------
     def instantaneous_power(self, attitude, t, x_km, y_km, z_km, A_panel, eta):
         S = self.S
         r = np.vstack((x_km, y_km, z_km)).T
@@ -418,7 +385,7 @@ class CubeSatSim:
         if attitude == "body-spin":
             cos_inc = np.full_like(t, 0.5)
         elif attitude == "sun-tracking":
-            cos_inc = np.ones_like(t)  # ideal sun-pointing panel
+            cos_inc = np.ones_like(t)
         elif attitude == "nadir-pointing":
             nhat = -rhat
             cos_inc = nhat @ S
@@ -459,11 +426,7 @@ class CubeSatSim:
         P = SOLAR_CONST * A_panel * eta * cos_inc
         return float(P.mean())
 
-    # ---------- Thermal (avg equilibrium) ----------
     def thermal_equilibrium(self, A_abs=None, A_rad=None, Q_internal_W=0.0, beta_for_thermal=None):
-        """
-        Q_solar_avg + Q_albedo_avg + Q_IR + Q_internal = ε σ A_rad T^4
-        """
         if A_abs is None:
             A_abs = self.A_panel
         if A_rad is None:
@@ -481,45 +444,36 @@ class CubeSatSim:
         T_K = (Q_total / (self.eps * SIGMA * A_rad)) ** 0.25
         return float(T_K - 273.15), Q_solar, Q_albedo, Q_ir, float(Q_internal_W), float(Q_total)
 
-    # ---------- Drag decay (simple daily integration) ----------
     def drag_decay_days(self, days, A_drag=None):
-        """
-        Super-simplified circular-orbit drag model integrating semi-major axis daily.
-        """
         A = self.A_panel if A_drag is None else float(A_drag)
-        a = R_E + self.h  # current semi-major axis (m)
+        a = R_E + self.h
         out = []
         for _ in range(int(days)):
-            rho = rho_msis_simple(a - R_E)  # kg/m^3
+            rho = rho_msis_simple(a - R_E)
             da_dt = - (self.Cd * A / self.m) * np.sqrt(MU * a) * rho
             a = a + da_dt * DAY_SEC
-            if a < R_E + 120e3:  # floor at ~120 km
+            if a < R_E + 120e3:
                 a = R_E + 120e3
             out.append(a - R_E)
-        return np.array(out) / 1000.0  # km
+        return np.array(out) / 1000.0
+
 
 # =========================
-# Session & pricing model
+# Pricing model & plan state
 # =========================
-if "user" not in st.session_state:
-    st.session_state.user = None  # can be extended with real auth later
-
 # Base plan in DB terms: 'trial' | 'standard' | 'pro'
 if "plan_base" not in st.session_state:
     st.session_state.plan_base = "trial"  # everyone starts in trial
 
-# Trial start date (for 30-day free trial)
 if "trial_start" not in st.session_state:
-    st.session_state.trial_start = dt.date.today().isoformat()  # YYYY-MM-DD
+    st.session_state.trial_start = dt.date.today().isoformat()
 
-# Compute effective plan
 today = dt.date.today()
 trial_start = dt.date.fromisoformat(st.session_state.trial_start)
 trial_end = trial_start + dt.timedelta(days=30)
 
 in_trial = (st.session_state.plan_base == "trial") and (today <= trial_end)
 
-# Trial only gets STANDARD features
 if in_trial:
     plan_effective = "standard"
 else:
@@ -529,53 +483,77 @@ st.session_state.effective_plan = plan_effective
 st.session_state.in_trial = in_trial
 st.session_state.trial_end = trial_end.isoformat()
 
+
 # =========================
-# Sidebar controls (including plan UI)
+# Sidebar controls (Account + Plan + Mission)
 # =========================
 with st.sidebar:
     st.header("Account")
-    if st.session_state.user is None:
-        email = st.text_input("Email (not wired yet)", "")
-        if st.button("Sign in (stub)"):
-            st.session_state.user = {"email": email or "guest@example.com"}
-    else:
-        st.success(f"Signed in as {st.session_state.user['email']}")
-        if st.button("Sign out"):
-            st.session_state.user = None
+
+    # Show Auth0 user info
+    picture = user.get("picture")
+    if picture:
+        st.image(picture, width=64)
+    st.markdown(f"**{user.get('name', 'User')}**")
+    st.caption(user.get("email", ""))
+
+    # Optional logout link (round-trip through Auth0)
+    st.markdown(f"[Sign out]({auth0_logout_url()})")
 
     st.header("Plan & Billing")
 
-    if st.session_state.in_trial:
-        st.markdown(f"**Current plan:** 🧪 Trial (Standard) — ends {st.session_state.trial_end}")
+    # Plan badge
+    badge_label = "Pro" if plan_effective == "pro" else "Standard"
+    if in_trial:
+        badge_label = "Trial (Standard)"
+
+    badge_color = "#1d4ed8" if plan_effective == "pro" else "#6c757d"
+    st.markdown(
+        f"""
+        <div style="
+            padding: 0.35rem 0.6rem;
+            border-radius: 999px;
+            display: inline-block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            background: {badge_color}20;
+            color: {badge_color};
+            border: 1px solid {badge_color};
+            margin-bottom: 0.3rem;
+        ">
+            Current plan: {badge_label}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if in_trial:
         st.caption(
-            "During your 30-day free trial you have full access to Standard features.\n\n"
-            "Pro features (Advanced Analysis, Save/Load & Export) require a Pro subscription."
+            f"30-day free trial of **Standard** features. "
+            f"Trial ends on **{st.session_state.trial_end}**.\n\n"
+            "Pro features (Advanced Analysis, Save/Load & Export) are locked during trial."
         )
     else:
-        label = st.session_state.plan_base.capitalize()  # Trial / Standard / Pro
-        st.markdown(f"**Current plan:** {label}")
+        st.caption("Upgrade to Pro to unlock Advanced Analysis and Save/Load & Export.")
 
     st.caption("Pricing: Standard $4.99/mo • Pro $9.99/mo")
 
-    if st.session_state.plan_base != "pro":
+    if plan_effective != "pro":
         st.markdown("**Upgrade options (stubbed):**")
         col_a, col_b = st.columns(2)
-
         with col_a:
             if st.button("Standard $4.99/mo"):
                 st.session_state.plan_base = "standard"
-                st.rerun()
-
-        # Pro button – primary (will now be blue via CSS)
+                st.experimental_rerun()
         with col_b:
             if st.button("🚀 Go Pro $9.99/mo", type="primary"):
                 st.session_state.plan_base = "pro"
-                st.rerun()
-
-        st.caption("In production, this would redirect to Stripe Checkout.")
+                st.experimental_rerun()
+        st.caption("In production, this would redirect to Stripe Checkout / Customer Portal.")
     else:
         st.success("✅ You are on the Pro plan.")
 
+    # --- Mission controls below are unchanged ---
     st.header("Preset & Validation")
     use_genesat = st.checkbox("Load GeneSat-1 defaults", True)
     auto_cal = st.checkbox("Calibrate avg power to GeneSat target (~4.5 W)", True)
@@ -627,41 +605,36 @@ if auto_cal:
         cal_factor = target_avgW / P_now
 
 # =========================
-# Tabs  (Drag before Advanced)
+# Tabs  (unchanged except for plan_effective gating)
 # =========================
 tab_orbit, tab_power, tab_thermal, tab_drag, tab_adv, tab_io = st.tabs([
-    "3D + Ground Track (aligned)", 
-    "Power", 
-    "Thermal", 
-    "Drag",                     # Drag before Advanced
-    "Advanced Analysis (Pro)",  # Pro-only
-    "Save/Load & Export (Pro)"  # Pro-only
+    "3D + Ground Track (aligned)",
+    "Power",
+    "Thermal",
+    "Drag",
+    "Advanced Analysis (Pro)",
+    "Save/Load & Export (Pro)"
 ])
 
-# =========================
-# TAB 1: ORBIT + ALIGNED GROUND TRACK
-# =========================
+# --- TAB 1: ORBIT ---
 with tab_orbit:
     st.subheader("3D Orbit (ECI) + Aligned Ground Track (ECEF)")
-
     t, u, x_km, y_km, z_km = sim.orbit_eci(N=720)
     lon_deg, lat_deg = sim.ground_track_from_eci(t, x_km, y_km, z_km)
     eclipsed = eclipse_mask_from_vec(x_km, y_km, z_km, sim.S)
 
-    # Sunlit/Eclipse segmented lines (static)
     x_sun, y_sun, z_sun = x_km.copy(), y_km.copy(), z_km.copy()
     x_sun[eclipsed] = None; y_sun[eclipsed] = None; z_sun[eclipsed] = None
     x_ecl, y_ecl, z_ecl = x_km.copy(), y_km.copy(), z_km.copy()
     x_ecl[~eclipsed] = None; y_ecl[~eclipsed] = None; z_ecl[~eclipsed] = None
 
-    # 3D Earth + path + marker
     fig3d = go.Figure()
-    uu = np.linspace(0, 2*np.pi, 60)
+    uu = np.linspace(0, 2 * np.pi, 60)
     vv = np.linspace(0, np.pi, 30)
     UU, VV = np.meshgrid(uu, vv)
-    xE = (R_E/1000.0)*np.cos(UU)*np.sin(VV)
-    yE = (R_E/1000.0)*np.sin(UU)*np.sin(VV)
-    zE = (R_E/1000.0)*np.cos(VV)
+    xE = (R_E / 1000.0) * np.cos(UU) * np.sin(VV)
+    yE = (R_E / 1000.0) * np.sin(UU) * np.sin(VV)
+    zE = (R_E / 1000.0) * np.cos(VV)
     fig3d.add_trace(go.Surface(x=xE, y=yE, z=zE, opacity=0.35, showscale=False, name="Earth"))
     fig3d.add_trace(go.Scatter3d(x=x_sun, y=y_sun, z=z_sun, mode="lines",
                                  line=dict(color="gold", width=4), name="Sunlit"))
@@ -671,7 +644,6 @@ with tab_orbit:
                                  mode="markers", marker=dict(size=6, color="red"),
                                  name="Sat"))
 
-    # Animate only the marker (Earth/path persist)
     frames3d = []
     step = 4
     for k in range(0, len(x_km), step):
@@ -695,7 +667,7 @@ with tab_orbit:
                 buttons=[dict(
                     label="Play", method="animate",
                     args=[None, dict(
-                        frame=dict(duration=int(40/anim_speed), redraw=True),
+                        frame=dict(duration=int(40 / anim_speed), redraw=True),
                         fromcurrent=True, mode="immediate"
                     )]
                 )]
@@ -703,7 +675,6 @@ with tab_orbit:
         )
     st.plotly_chart(fig3d, use_container_width=True)
 
-    # Ground track + marker (synchronized)
     fig_gt = go.Figure()
     fig_gt.add_trace(go.Scattergeo(lon=lon_deg, lat=lat_deg, mode="lines",
                                    line=dict(color="royalblue", width=2), name="Path"))
@@ -729,7 +700,7 @@ with tab_orbit:
                 buttons=[dict(
                     label="Play", method="animate",
                     args=[None, dict(
-                        frame=dict(duration=int(40/anim_speed), redraw=True),
+                        frame=dict(duration=int(40 / anim_speed), redraw=True),
                         fromcurrent=True, mode="immediate"
                     )]
                 )]
@@ -738,26 +709,22 @@ with tab_orbit:
     st.plotly_chart(fig_gt, use_container_width=True)
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("Orbital period (min)", f"{sim.T_orbit/60.0:.2f}")
+    c1.metric("Orbital period (min)", f"{sim.T_orbit / 60.0:.2f}")
     c2.metric("Eclipse fraction", f"{sim.eclipse_fraction():.3f}")
     c3.metric("Earth view factor", f"{sim.VF:.3f}")
     st.caption("Tip: increasing |β| shortens/eradicates eclipse; beyond a critical β there's no eclipse.")
 
-# =========================
-# TAB 2: POWER
-# =========================
+# --- TAB 2: POWER ---
 with tab_power:
     st.subheader("Power — instantaneous, average, β-sweep, and SoC")
     st.caption("Orbit-average power is usually 30–60% of peak. GeneSat-1 ≈ 4–5 W OAP.")
 
-    # Orbit power profile (one orbit)
     N_orbit = 720
     t_orb, u, x_km, y_km, z_km = sim.orbit_eci(N=N_orbit)
     dt_step = float(t_orb[1] - t_orb[0])
     P_inst, cos_inc, ecl = sim.instantaneous_power(attitude, t_orb, x_km, y_km, z_km, sim.A_panel, sim.eta)
     P_inst = P_inst * cal_factor * elec_derate
 
-    # Instantaneous power plot
     st.plotly_chart(
         px.line(
             x=(t_orb / t_orb[-1]) * 360.0,
@@ -769,7 +736,6 @@ with tab_power:
         use_container_width=True
     )
 
-    # β-sweep (OAP vs β) — single-attitude view
     st.markdown("### β-angle sweep (current attitude)")
     betas = np.linspace(-80, 80, 161)
     oap = np.array([sim.avg_power_at_beta(attitude, b, sim.A_panel, sim.eta) for b in betas])
@@ -786,7 +752,6 @@ with tab_power:
         use_container_width=True
     )
 
-    # ---------- SoC basic ----------
     st.markdown("### Battery & Load (baseline SoC)")
     cons_W = st.slider("Average consumption (W)", 0.1, 50.0, 3.0, 0.1)
     batt_Wh = st.slider("Battery capacity (Wh)", 5.0, 1000.0, 30.0, 1.0)
@@ -818,7 +783,6 @@ with tab_power:
             soc_wh = max(soc_wh - dE_Wh, 0.0)
         soc_series[k] = 100.0 * soc_wh / batt_Wh
 
-    # Downsample for plotting if very long
     max_pts = 5000
     if total_steps > max_pts:
         idx = np.linspace(0, total_steps - 1, max_pts).astype(int)
@@ -828,7 +792,6 @@ with tab_power:
         ts_plot = t_timeline / 3600.0
         soc_plot = soc_series
 
-    # End-of-day SoC
     eod_idx = (np.arange(1, mission_days + 1) * int(np.floor(DAY_SEC / dt_step))).clip(0, total_steps - 1)
     eod_soc = soc_series[eod_idx]
     df_soc_daily = pd.DataFrame({"Day": np.arange(1, len(eod_idx) + 1), "SoC (%)": eod_soc})
@@ -866,9 +829,7 @@ with tab_power:
     elif len(eod_soc):
         st.success("Battery SoC projection looks acceptable.")
 
-# =========================
-# TAB 3: THERMAL
-# =========================
+# --- TAB 3: THERMAL ---
 with tab_thermal:
     st.subheader("Radiative Thermal Equilibrium (current β)")
     A_abs = st.number_input("Absorbing area A_abs (m²)", 0.001, 2.0, sim.A_panel, 0.001)
@@ -896,9 +857,7 @@ with tab_thermal:
         use_container_width=True
     )
 
-# =========================
-# TAB 4: DRAG
-# =========================
+# --- TAB 4: DRAG ---
 with tab_drag:
     st.subheader("Altitude Decay from Drag (simple mission view)")
     A_drag = st.number_input("Reference drag area (m²)", 0.001, 2.0, sim.A_panel, 0.001)
@@ -915,9 +874,7 @@ with tab_drag:
         use_container_width=True
     )
 
-# =========================
-# TAB 5: ADVANCED ANALYSIS (Pro-only)
-# =========================
+# --- TAB 5: ADVANCED (Pro-only by plan_effective) ---
 with tab_adv:
     st.markdown("## Advanced Analysis (Pro)")
     st.caption("Multi-β, multi-orbit, and envelope visualizations.")
@@ -935,8 +892,6 @@ with tab_adv:
             "- Extended orbit lifetime curve"
         )
     else:
-        # ---------- 1) Multi-β power curves for all attitudes ----------
-        st.markdown("### 1. Multi-β Power Curves (all attitudes)")
         betas_adv = np.linspace(-80, 80, 97)
         att_list = ["body-spin", "sun-tracking", "nadir-pointing"]
         rows = []
@@ -959,7 +914,6 @@ with tab_adv:
         )
         st.plotly_chart(fig_multi_beta, use_container_width=True)
 
-        # ---------- 2) Multi-orbit SoC plot ----------
         st.markdown("### 2. Multi-orbit Battery SoC (mission timeline)")
         N_orbit_adv = 720
         t_orb_adv, u_adv, x_km_adv, y_km_adv, z_km_adv = sim.orbit_eci(N=N_orbit_adv)
@@ -1000,7 +954,6 @@ with tab_adv:
             use_container_width=True
         )
 
-        # ---------- 3) Thermal envelope vs β ----------
         st.markdown("### 3. Thermal Envelope vs β")
         betas_th = np.linspace(-80, 80, 65)
         temps_eq = []
@@ -1021,7 +974,6 @@ with tab_adv:
         c_min.metric("Min T_eq over β (°C)", f"{df_temp['T_eq_C'].min():.1f}")
         c_max.metric("Max T_eq over β (°C)", f"{df_temp['T_eq_C'].max():.1f}")
 
-        # ---------- 4) Ground-track density plot ----------
         st.markdown("### 4. Ground-track Density Map")
         dens_days = st.slider("Days for density map", 1, min(60, mission_days), min(7, mission_days))
         num_orbits_dens = max(1, int(np.ceil(dens_days * DAY_SEC / sim.T_orbit)))
@@ -1041,7 +993,6 @@ with tab_adv:
         )
         st.plotly_chart(fig_dens, use_container_width=True)
 
-        # ---------- 5) Orbit lifetime curve (extended) ----------
         st.markdown("### 5. Orbit Lifetime Curve (Drag Decay)")
         lifetime_days = st.slider("Lifetime analysis (days)", mission_days, 3650, max(mission_days, 365))
         A_drag_adv = st.number_input("Drag area A_drag (m²) for lifetime", 0.001, 2.0, sim.A_panel, 0.001)
@@ -1059,9 +1010,7 @@ with tab_adv:
         if len(alt_series_adv):
             st.metric("Final altitude (km)", f"{alt_series_adv[-1]:.1f}")
 
-# =========================
-# TAB 6: SAVE/LOAD & EXPORT (Pro-only)
-# =========================
+# --- TAB 6: SAVE/LOAD & EXPORT (Pro-only) ---
 with tab_io:
     st.subheader("Save/Load & Export (Pro)")
     st.markdown("⬇️ **Save / Load Missions & Export Data**")
@@ -1092,7 +1041,6 @@ with tab_io:
             mime="application/json"
         )
 
-        # Export one-orbit ECI & Power
         t_orb2, u_orb, x_orb, y_orb, z_orb = sim.orbit_eci(N=720)
         P_orb, _, _ = sim.instantaneous_power(attitude, t_orb2, x_orb, y_orb, z_orb, sim.A_panel, sim.eta)
         P_orb = P_orb * cal_factor * elec_derate
