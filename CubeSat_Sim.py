@@ -490,7 +490,7 @@ class CubeSatSim:
         T_int_init_C=0.0,
         max_iter=200,
         tol_K=1e-3,
-    ):
+        ):
         """
         Simple 2-node, orbit-average thermal model:
         - Node 1: external shell (sees Sun/albedo/IR, radiates to space)
