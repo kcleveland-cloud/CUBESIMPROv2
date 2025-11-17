@@ -1,50 +1,39 @@
 import streamlit as st
 import urllib.parse
 import requests
+from jose import jwt
 
 # ---------------------------
 # Simple Auth0 helpers inline
 # ---------------------------
 
 # ---------------------------
-# Simple Auth0 helpers inline
+# Auth0 helpers (simple flow)
 # ---------------------------
 
-def auth0_login_button():
-    """Show a 'Sign in' link."""
+def auth0_login_url():
+    """Build the Auth0 login URL."""
     domain = st.secrets["AUTH0_DOMAIN"]
     client_id = st.secrets["AUTH0_CLIENT_ID"]
     redirect_uri = st.secrets["AUTH0_CALLBACK_URL"]
 
-    auth_url = (
-        f"https://{domain}/authorize?"
-        + urllib.parse.urlencode({
-            "response_type": "code",          # use code flow
-            "client_id": client_id,
-            "redirect_uri": redirect_uri,
-            "scope": "openid profile email",
-        })
-    )
-
-    st.markdown(f"[Sign in]({auth_url})")
+    params = {
+        "response_type": "code",
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "scope": "openid profile email",
+    }
+    return f"https://{domain}/authorize?" + urllib.parse.urlencode(params)
 
 
+def login_button():
+    """Show a clickable link to Auth0."""
+    url = auth0_login_url()
+    st.markdown(f"[Click here to sign in]({url})")
 
 
-def auth0_handle_callback():
-    """
-    If Auth0 has redirected back with ?code=..., trade that for tokens
-    and store the user info in session_state.
-    """
-    params = st.query_params
-
-    code = params.get("code")
-    if isinstance(code, list):
-        code = code[0]
-
-    if not code:
-        return  # no callback yet
-
+def _exchange_code_for_tokens(code: str):
+    """Talk to Auth0 /oauth/token to trade code for tokens."""
     domain = st.secrets["AUTH0_DOMAIN"]
     client_id = st.secrets["AUTH0_CLIENT_ID"]
     client_secret = st.secrets["AUTH0_CLIENT_SECRET"]
@@ -61,79 +50,72 @@ def auth0_handle_callback():
 
     resp = requests.post(token_url, data=data)
     resp.raise_for_status()
-    tokens = resp.json()
-    id_token = tokens["id_token"]
-
-    # For now, decode without strict verification (OK for dev)
-    claims = jwt.get_unverified_claims(id_token)
-
-    st.session_state["user"] = {
-        "sub": claims.get("sub"),
-        "email": claims.get("email"),
-        "name": claims.get("name"),
-        "picture": claims.get("picture"),
-    }
-    st.session_state["id_token"] = id_token
-
-    # Clear query params so refresh doesn't re-process the code
-    st.query_params.clear()
-
-
-def auth0_is_logged_in():
-    """Check if user is logged in; if not, see if there's a callback to process."""
-    if "user" in st.session_state:
-        return True
-
-    # See if Auth0 just redirected back with a code
-    auth0_handle_callback()
-    return "user" in st.session_state
-
-
-# Backwards-compatible wrappers so existing code still works
-def login_button():
-    auth0_login_button()
+    return resp.json()
 
 
 def get_user():
     """
-    Return the current user dict, or None.
-    Your existing 'if not get_user()' checks will now work.
+    Returns the current user dict, or None.
+
+    1) If user already in session_state -> return it.
+    2) Else, if we have ?code=... in URL -> exchange it, store user, clear params.
+    3) Else return None.
     """
-    if auth0_is_logged_in():
-        return st.session_state.get("user")
+    # 1. Already logged in?
+    if "user" in st.session_state:
+        return st.session_state["user"]
+
+    # 2. See if Auth0 sent us back with ?code=...
+    params = st.experimental_get_query_params()
+    code_list = params.get("code")
+    if code_list:
+        code = code_list[0]
+        try:
+            tokens = _exchange_code_for_tokens(code)
+            id_token = tokens["id_token"]
+            claims = jwt.get_unverified_claims(id_token)
+
+            user = {
+                "sub": claims.get("sub"),
+                "email": claims.get("email"),
+                "name": claims.get("name"),
+                "picture": claims.get("picture"),
+            }
+            st.session_state["user"] = user
+
+            # Clear query params so we don't keep reprocessing code
+            st.experimental_set_query_params()
+            return user
+        except Exception as e:
+            st.error(f"Auth error: {e}")
+            return None
+
+    # 3. Not logged in, no callback
     return None
 
-
-def auth0_is_logged_in():
-    # NOTE: This is a very naive placeholder. For now we'll just say "not logged in",
-    # so you can get past the ModuleNotFoundError. We'll wire this up properly next.
-    return False
-
-# Backwards-compatible wrappers so existing code still works
-def login_button():
-    auth0_login_button()
-
-def get_user():
-    # For now just return True/False like auth0_is_logged_in.
-    # Later we can make this return a user object instead.
-    return auth0_is_logged_in()
 
 
 st.title("CATSIM — CubeSat Simulator")
 
-if not get_user():
-    st.write("Please sign in to continue.")
-    auth0_login_button()
+user = get_user()
+if not user:
+    st.title("CATSIM — Sign in")
+    st.write("Please sign in to use the CubeSat Mission Simulator.")
+    login_button()
     st.stop()
 
-st.success("You are logged in!")
 
+# Sidebar info for signed-in user
 with st.sidebar:
     st.markdown("---")
     st.write("**Signed in as:**")
-    st.write(user["email"])
+    st.write(user.get("email", "Unknown user"))
     if user.get("name"):
         st.write(f"({user['name']})")
+
+st.title("CATSIM — CubeSat Mission Simulator")
+# ... rest of your CATSIM app ...
+
         
 # ... rest of your simulator here ...
 
