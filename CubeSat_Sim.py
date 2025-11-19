@@ -13,10 +13,13 @@ import plotly.express as px
 import datetime as dt
 
 # =========================
-# Environment / config
+# Environment: dev vs prod
 # =========================
-ENV = os.getenv("CATSIM_ENV", "dev")  # "dev" or "prod"
-IS_DEV = ENV != "dev"
+# Streamlit Cloud:
+#   - Dev app:  CATSIM_ENV=dev
+#   - Prod app: CATSIM_ENV=prod
+ENV = os.getenv("CATSIM_ENV", "dev")  # default to 'dev' if not set
+DEV_MODE = (ENV == "dev")
 
 CONFIG = {
     "dev": {
