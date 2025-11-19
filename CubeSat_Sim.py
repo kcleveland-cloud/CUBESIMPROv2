@@ -1011,50 +1011,51 @@ with st.sidebar:
                 """
             )
 
-    if st.session_state.plan_base != "pro":
+        if st.session_state.plan_base != "pro":
 
-    st.markdown("### Upgrade")
+        st.markdown("### Upgrade")
 
-    col_a, col_b = st.columns(2)
-    with col_a:
-        if st.button("Standard $9.99/mo"):
-            st.session_state.plan_base = "standard"
-            st.rerun()
-        if st.button("Standard $99/yr"):
-            st.session_state.plan_base = "standard"
-            st.rerun()
+        col_a, col_b = st.columns(2)
+        with col_a:
+            if st.button("Standard $9.99/mo"):
+                st.session_state.plan_base = "standard"
+                st.rerun()
+            if st.button("Standard $99/yr"):
+                st.session_state.plan_base = "standard"
+                st.rerun()
 
-    with col_b:
-        if st.button("🚀 Pro $19.99/mo", type="primary"):
-            st.session_state.plan_base = "pro"
-            st.rerun()
-        if st.button("🚀 Pro $199/yr", type="primary"):
-            st.session_state.plan_base = "pro"
-            st.rerun()
+        with col_b:
+            if st.button("🚀 Pro $19.99/mo", type="primary"):
+                st.session_state.plan_base = "pro"
+                st.rerun()
+            if st.button("🚀 Pro $199/yr", type="primary"):
+                st.session_state.plan_base = "pro"
+                st.rerun()
 
-    st.markdown("**Education & teams:**")
-    col_c, col_d = st.columns(2)
+        st.markdown("**Education & teams:**")
+        col_c, col_d = st.columns(2)
 
-    with col_c:
-        if st.button(
-            "Academic Pro $99/yr",
-            key="academic",
-            help="Academic license",
-        ):
-            st.session_state.plan_base = "pro"
-            st.rerun()
+        with col_c:
+            if st.button(
+                "Academic Pro $99/yr",
+                key="academic",
+                help="Academic license",
+            ):
+                st.session_state.plan_base = "pro"
+                st.rerun()
 
-    with col_d:
-        if st.button(
-            "Dept License $499/yr",
-            key="dept",
-            help="Department license",
-        ):
-            st.session_state.plan_base = "pro"
-            st.rerun()
+        with col_d:
+            if st.button(
+                "Dept License $499/yr",
+                key="dept",
+                help="Department license",
+            ):
+                st.session_state.plan_base = "pro"
+                st.rerun()
 
-else:
-    st.success("✅ You are on the Pro plan.")
+    else:
+        st.success("✅ You are on the Pro plan.")
+
 
 
     # -------------------------
