@@ -959,18 +959,18 @@ with st.sidebar:
             )
 
         if st.session_state.plan_base != "pro":
-        st.markdown("**Upgrade options (stubbed):**")
-        col_a, col_b = st.columns(2)
+            st.markdown("**Upgrade options (stubbed):**")
+            col_a, col_b = st.columns(2)
 
-        with col_a:
-            if st.button("Standard $9.99/mo"):
-                st.session_state.plan_base = "standard"
-                st.rerun()
+            with col_a:
+                if st.button("Standard $9.99/mo"):
+                    st.session_state.plan_base = "standard"
+                    st.rerun()
 
-        with col_b:
-            if st.button("🚀 Go Pro $19.99/mo", type="primary"):
-                st.session_state.plan_base = "pro"
-                st.rerun()
+            with col_b:
+                if st.button("🚀 Go Pro $19.99/mo", type="primary"):
+                    st.session_state.plan_base = "pro"
+                    st.rerun()
 
         st.caption("In production, this would redirect to Stripe Checkout (monthly or annual).")
     else:
