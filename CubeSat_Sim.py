@@ -1045,30 +1045,31 @@ with st.sidebar:
                 # In production, route to Pro annual Stripe Checkout
                 st.rerun()
 
-                st.markdown("**Education & teams:**")
-        col_c, col_d = st.columns(2)
+    st.markdown("**Education & teams:**")
+    col_c, col_d = st.columns(2)
 
-        # Academic Pro (green via CSS title selector)
-        with col_c:
-            if st.button(
-                "Academic Pro $99/yr",
-                key="academic",
-                help="Academic license",   # <- this becomes title="Academic license"
-            ):
-                st.session_state.plan_base = "pro"
-                # In production, route to Academic Pro Stripe Checkout
-                st.rerun()
+    # Academic Pro (green via aria-label selector)
+    with col_c:
+        if st.button(
+            "Academic Pro $99/yr",
+            key="academic",
+            help="Academic license",
+        ):
+            st.session_state.plan_base = "pro"
+            # In production, route to Academic Pro Stripe Checkout
+            st.rerun()
 
-        # Department License (green via CSS title selector)
-        with col_d:
-            if st.button(
-                "Dept License $499/yr",
-                key="dept",
-                help="Department license",  # <- this becomes title="Department license"
-            ):
-                st.session_state.plan_base = "pro"
-                # In production, route to Dept License Stripe Checkout
-                st.rerun()
+    # Department License (green via aria-label selector)
+    with col_d:
+        if st.button(
+            "Dept License $499/yr",
+            key="dept",
+            help="Department license",
+        ):
+            st.session_state.plan_base = "pro"
+            # In production, route to Dept License Stripe Checkout
+            st.rerun()
+
 
     else:
         st.success("You are on the Pro plan. Thank you for supporting CATSIM!")
