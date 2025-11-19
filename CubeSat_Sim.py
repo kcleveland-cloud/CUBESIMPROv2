@@ -180,11 +180,12 @@ def inject_brand_css():
             color: #38bdf8;
         }
 
+        /* Dataframe table sizing */
         .dataframe th, .dataframe td {
             font-size: 0.85rem !important;
         }
 
-        /* GLOBAL PRIMARY buttons (e.g., Go Pro) — blue */
+        /* PRIMARY buttons (e.g., Go Pro) — blue */
         button[kind="primary"],
         button[data-testid="baseButton-primary"] {
             background-color: #1d4ed8 !important;
@@ -198,21 +199,22 @@ def inject_brand_css():
             color: #ffffff !important;
         }
 
-        /* SIDEBAR secondary buttons (Standard, Academic, Dept, etc.) — FORCE GREEN */
-        div[data-testid="stSidebar"] button[data-testid="baseButton-secondary"] {
-            background-color: #16a34a !important;   /* green-600 */
-            border-color: #16a34a !important;
-            color: #ffffff !important;
+        /* SIDEBAR non-primary buttons — white with blue border */
+        div[data-testid="stSidebar"] button:not([data-testid="baseButton-primary"]) {
+            background-color: #ffffff !important;
+            color: #1d4ed8 !important;
+            border: 1px solid #1d4ed8 !important;
         }
-        div[data-testid="stSidebar"] button[data-testid="baseButton-secondary"]:hover {
-            background-color: #15803d !important;   /* green-700 */
-            border-color: #15803d !important;
-            color: #ffffff !important;
+        div[data-testid="stSidebar"] button:not([data-testid="baseButton-primary"]):hover {
+            background-color: #eff6ff !important;
+            color: #1d4ed8 !important;
+            border-color: #1d4ed8 !important;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
+
 
 
 
