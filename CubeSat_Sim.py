@@ -162,6 +162,18 @@ def inject_brand_css():
             --primaryColor: #1d4ed8 !important;
         }
 
+        /* Academic / Department buttons — green */
+        button.academic-btn {
+        background-color: #16a34a !important;   /* green-600 */
+        border: 1px solid #16a34a !important;
+        color: #ffffff !important;
+        }
+
+        button.academic-btn:hover {
+        background-color: #15803d !important;   /* green-700 */
+        border-color: #15803d !important;
+        }
+
         /* Top nav bar */
         .cats-nav {
             background: #020617;
