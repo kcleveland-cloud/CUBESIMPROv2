@@ -13,6 +13,19 @@ import plotly.express as px
 import datetime as dt
 
 # =========================
+# Stripe Payment Links (Phase 1: simple)
+# =========================
+# TODO: Paste in your real Stripe payment link URLs from the dashboard.
+
+STD_MONTHLY_LINK = os.getenv("CATSIM_STD_MONTHLY_LINK", "https://buy.stripe.com/9B6fZha0B43ugPmbKF1RC00")
+STD_YEARLY_LINK  = os.getenv("CATSIM_STD_YEARLY_LINK", "https://buy.stripe.com/4gM7sL7StcA09mU1611RC01")
+PRO_MONTHLY_LINK = os.getenv("CATSIM_PRO_MONTHLY_LINK", "https://buy.stripe.com/9B68wPegR8jKeHe8yt1RC02")
+PRO_YEARLY_LINK  = os.getenv("CATSIM_PRO_YEARLY_LINK", "https://buy.stripe.com/dRmbJ17St8jK9mUeWR1RC03")
+ACADEMIC_LINK    = os.getenv("CATSIM_ACAD_LINK", "https://buy.stripe.com/dRm9AT7StarS56E7up1RC04")   # optional
+DEPT_LINK        = os.getenv("CATSIM_DEPT_LINK", "https://buy.stripe.com/4gM5kD5Kl9nO7eMaGB1RC05")   # optional
+
+
+# =========================
 # Environment: dev vs prod
 # =========================
 # Streamlit Cloud:
@@ -1002,47 +1015,55 @@ with st.sidebar:
                 """
             )
 
-        if st.session_state.plan_base != "pro":
+                if st.session_state.plan_base != "pro":
 
             st.markdown("### Upgrade")
 
             col_a, col_b = st.columns(2)
-            with col_a:
-                if st.button("Standard $9.99/mo"):
-                    st.session_state.plan_base = "standard"
-                    st.rerun()
-                if st.button("Standard $99/yr"):
-                    st.session_state.plan_base = "standard"
-                    st.rerun()
 
+            # Standard plans → Stripe Payment Links
+            with col_a:
+                st.link_button(
+                    "Standard $9.99/mo",
+                    STD_MONTHLY_LINK,
+                    help="Subscribe to CATSIM Standard Monthly",
+                )
+                st.link_button(
+                    "Standard $99/yr",
+                    STD_YEARLY_LINK,
+                    help="Subscribe to CATSIM Standard Yearly",
+                )
+
+            # Pro plans → Stripe Payment Links (primary style via our CSS)
             with col_b:
-                if st.button("🚀 Pro $19.99/mo", type="primary"):
-                    st.session_state.plan_base = "pro"
-                    st.rerun()
-                if st.button("🚀 Pro $199/yr", type="primary"):
-                    st.session_state.plan_base = "pro"
-                    st.rerun()
+                st.link_button(
+                    "🚀 Pro $19.99/mo",
+                    PRO_MONTHLY_LINK,
+                    help="Subscribe to CATSIM Pro Monthly",
+                )
+                st.link_button(
+                    "🚀 Pro $199/yr",
+                    PRO_YEARLY_LINK,
+                    help="Subscribe to CATSIM Pro Yearly",
+                )
 
             st.markdown("**Education & teams:**")
             col_c, col_d = st.columns(2)
 
             with col_c:
-                if st.button(
+                st.link_button(
                     "Academic Pro $99/yr",
-                    key="academic",
-                    help="Academic license",
-                ):
-                    st.session_state.plan_base = "pro"
-                    st.rerun()
+                    ACADEMIC_LINK,
+                    help="Academic license (students & faculty)",
+                )
 
             with col_d:
-                if st.button(
+                st.link_button(
                     "Dept License $499/yr",
-                    key="dept",
-                    help="Department license",
-                ):
-                    st.session_state.plan_base = "pro"
-                    st.rerun()
+                    DEPT_LINK,
+                    help="Department / lab license",
+                )
+
 
         else:
             st.success("✅ You are on the Pro plan.")
