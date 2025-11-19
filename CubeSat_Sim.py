@@ -19,7 +19,7 @@ ENV = os.getenv("CATSIM_ENV", "dev")  # "dev" or "prod"
 IS_DEV = ENV != "prod"
 
 CONFIG = {
-"dev": {
+    "dev": {
         # Dev Auth0 app
         "AUTH0_DOMAIN": "dev-qwn3runpmc616as6.us.auth0.com",
         "AUTH0_CLIENT_ID": "c2tqv60NLCMmiN6fGeIWk5DpYnb4t5Vo",
@@ -34,12 +34,12 @@ CONFIG = {
     },
     "prod": {
         # TODO: replace these with your production Auth0 app settings
-        "AUTH0_DOMAIN": os.getenv("AUTH0_DOMAIN_PROD", "YOUR-PROD-AUTH0-DOMAIN"),
-        "AUTH0_CLIENT_ID": os.getenv("AUTH0_CLIENT_ID_PROD", "YOUR-PROD-CLIENT-ID"),
-        "AUTH0_CLIENT_SECRET": os.getenv("AUTH0_CLIENT_SECRET_PROD", "YOUR-PROD-CLIENT-SECRET"),
+        "AUTH0_DOMAIN": os.getenv("dev-qwn3runpmc616as6.us.auth0.com"),
+        "AUTH0_CLIENT_ID": os.getenv("XvRZKwcHlcToRYGMMwnZiNjLnNzJmUmU"),
+        "AUTH0_CLIENT_SECRET": os.getenv("AUTH0_CLIENT_SECRET_PROD", "y7Sn91jH3sR1seU5uWPJAM89BSmS-pXfPQPcfDLzt_K3Cu2fk-D0vzYnA2sE2lah"),
         "AUTH0_CALLBACK_URL": os.getenv(
             "AUTH0_CALLBACK_URL_PROD",
-            "https://your-prod-catsim-url.streamlit.app",
+            "https://cubesimprov2-lt6hcgkvpdvygnwbktyqdg.streamlit.app",
         ),
         "SHOW_DEV_PLAN_SIM": False,
     },
