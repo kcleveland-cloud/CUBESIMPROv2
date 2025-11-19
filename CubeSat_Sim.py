@@ -20,6 +20,7 @@ import datetime as dt
 #   - Prod app: CATSIM_ENV=prod
 ENV = os.getenv("CATSIM_ENV", "dev")  # default to 'dev' if not set
 DEV_MODE = (ENV == "dev")
+IS_DEV = DEV_MODE
 
 CONFIG = {
     "dev": {
