@@ -162,16 +162,15 @@ def inject_brand_css():
             --primaryColor: #1d4ed8 !important;
         }
 
-        /* Academic / Department buttons — green */
-        button.academic-btn {
-        background-color: #16a34a !important;   /* green-600 */
-        border: 1px solid #16a34a !important;
-        color: #ffffff !important;
+        /* Academic / Department buttons — green, scoped to edu-buttons container */
+        #edu-buttons button {
+            background-color: #16a34a !important;   /* green-600 */
+            border: 1px solid #16a34a !important;
+            color: #ffffff !important;
         }
-
-        button.academic-btn:hover {
-        background-color: #15803d !important;   /* green-700 */
-        border-color: #15803d !important;
+        #edu-buttons button:hover {
+            background-color: #15803d !important;   /* green-700 */
+            border-color: #15803d !important;
         }
 
         /* Top nav bar */
@@ -989,8 +988,6 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
 
-    # NOTE: removed the old "Draft pricing" caption here
-
     # Dev-only long pricing copy (collapsed)
     if DEV_MODE:
         with st.expander("🧭 Full pricing structure (dev)", expanded=False):
@@ -1049,61 +1046,28 @@ with st.sidebar:
                 st.rerun()
 
         st.markdown("**Education & teams:**")
+
+        # Wrap academic buttons in a container so CSS can target them
+        st.markdown('<div id="edu-buttons">', unsafe_allow_html=True)
         col_c, col_d = st.columns(2)
 
-        # Academic & Department license buttons (green)
         with col_c:
-            st.markdown(
-                """
-            <style>
-        /* Academic + Department buttons: green */
-        div[data-testid="stButton"] .academic-btn {
-            background-color: #16a34a !important;   /* green-600 */
-            border: 1px solid #16a34a !important;
-            color: white !important;
-        }
-        div[data-testid="stButton"] .academic-btn:hover {
-            background-color: #15803d !important;   /* green-700 */
-            border-color: #15803d !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+            # Academic Pro
+            if st.button("Academic Pro $99/yr", key="academic", help="Academic license"):
+                st.session_state.plan_base = "pro"
+                # In production, route to Academic Pro Stripe Checkout
+                st.rerun()
 
-    # Academic Pro
-    if st.button("Academic Pro $99/yr", key="academic", help="Academic license"):
-        st.session_state.plan_base = "pro"
-        st.rerun()
+        with col_d:
+            # Department License
+            if st.button("Dept License $499/yr", key="dept", help="Department license"):
+                st.session_state.plan_base = "pro"
+                # In production, route to Dept License Stripe Checkout
+                st.rerun()
 
-    # Apply green class
-    st.markdown(
-        """
-        <script>
-        const btn = window.parent.document.querySelector('button[data-testid="baseButton- academic"]');
-        if(btn){ btn.classList.add("academic-btn"); }
-        </script>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-with col_d:
-    # Department License
-    if st.button("Dept License $499/yr", key="dept", help="Department license"):
-        st.session_state.plan_base = "pro"
-        st.rerun()
-
-    st.markdown(
-        """
-        <script>
-        const btn2 = window.parent.document.querySelector('button[data-testid="baseButton- dept"]');
-        if(btn2){ btn2.classList.add("academic-btn"); }
-        </script>
-        """,
-        unsafe_allow_html=True
-    )
-
+        st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        st.success("You are on the Pro plan. Thank you for supporting CATSIM!")
 
     # -------------------------
     # Simulation Setup
