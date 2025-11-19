@@ -40,7 +40,10 @@ CONFIG = {
         # TODO: replace these with your production Auth0 app settings
         "AUTH0_DOMAIN": os.getenv("dev-qwn3runpmc616as6.us.auth0.com"),
         "AUTH0_CLIENT_ID": os.getenv("XvRZKwcHlcToRYGMMwnZiNjLnNzJmUmU"),
-        "AUTH0_CLIENT_SECRET": os.getenv("AUTH0_CLIENT_SECRET_PROD", "y7Sn91jH3sR1seU5uWPJAM89BSmS-pXfPQPcfDLzt_K3Cu2fk-D0vzYnA2sE2lah"),
+        "AUTH0_CLIENT_SECRET": os.getenv(
+            "AUTH0_CLIENT_SECRET_PROD",
+            "y7Sn91jH3sR1seU5uWPJAM89BSmS-pXfPQPcfDLzt_K3Cu2fk-D0vzYnA2sE2lah",
+        ),
         "AUTH0_CALLBACK_URL": os.getenv(
             "AUTH0_CALLBACK_URL_PROD",
             "https://cubesimprov2-lt6hcgkvpdvygnwbktyqdg.streamlit.app",
@@ -509,7 +512,6 @@ class CubeSatSim:
         T_K = (Q_total / (self.eps * SIGMA * A_rad)) ** 0.25
         return float(T_K - 273.15), Q_solar, Q_albedo, Q_ir, float(Q_internal_W), float(Q_total)
 
-
     def thermal_equilibrium_2node(
         self,
         A_abs_shell=None,
@@ -621,7 +623,6 @@ class CubeSatSim:
         }
 
         return (T_shell - 273.15), (T_int - 273.15), diagnostics
-
 
     def drag_decay_days(self, days, A_drag=None):
         A = self.A_panel if A_drag is None else float(A_drag)
@@ -933,7 +934,9 @@ with st.sidebar:
         st.markdown(f"**Current plan:** {label}")
 
     # Pricing caption (stays in sidebar)
-    st.caption("Pricing (draft): Standard $9.99/mo • Pro $19.99/mo • Academic Pro $99/yr • Department $499/yr")
+    st.caption(
+        "Pricing (draft): Standard $9.99/mo • Pro $19.99/mo • Academic Pro $99/yr • Department $499/yr"
+    )
 
     # ----- Dev-only pricing summary (for copy tuning) -----
     if DEV_MODE:
@@ -973,17 +976,9 @@ with st.sidebar:
                 st.session_state.plan_base = "pro"
                 st.rerun()
 
-        st.caption("In production, this would redirect to Stripe Checkout (monthly or annual).")
-    else:
-        st.success("✅ You are on the Pro plan.")
-
-
-        st.caption("In production, this would redirect to Stripe Checkout (monthly or annual).")
-    else:
-        st.success("✅ You are on the Pro plan.")
-
-
-        st.caption("In production, this would redirect to Stripe Checkout.")
+        st.caption(
+            "In production, these buttons would redirect to Stripe Checkout (monthly or annual)."
+        )
     else:
         st.success("✅ You are on the Pro plan.")
 
@@ -995,28 +990,34 @@ with st.sidebar:
     st.header("Mission Parameters")
     if use_genesat:
         altitude_km = st.slider("Altitude (km)", 200.0, 700.0, GENESAT_DEFAULTS["altitude_km"])
-        incl_deg    = st.slider("Inclination (deg)", 0.0, 98.0, GENESAT_DEFAULTS["incl_deg"])
-        mass_kg     = st.number_input("Mass (kg)", 0.1, 50.0, GENESAT_DEFAULTS["mass_kg"], 0.1)
-        Cd          = st.slider("Drag coefficient Cd", 1.5, 3.0, GENESAT_DEFAULTS["Cd"], 0.1)
-        panel_area  = st.number_input("Panel area / face (m²)", 0.001, 0.5, GENESAT_DEFAULTS["panel_area_m2"], 0.001)
-        panel_eff   = st.slider("Panel efficiency η", 0.05, 0.38, GENESAT_DEFAULTS["panel_eff"], 0.01)
-        absorp      = st.slider("Absorptivity α", 0.1, 1.0, GENESAT_DEFAULTS["absorptivity"], 0.01)
-        emiss       = st.slider("Emissivity ε", 0.1, 1.0, GENESAT_DEFAULTS["emissivity"], 0.01)
+        incl_deg = st.slider("Inclination (deg)", 0.0, 98.0, GENESAT_DEFAULTS["incl_deg"])
+        mass_kg = st.number_input("Mass (kg)", 0.1, 50.0, GENESAT_DEFAULTS["mass_kg"], 0.1)
+        Cd = st.slider("Drag coefficient Cd", 1.5, 3.0, GENESAT_DEFAULTS["Cd"], 0.1)
+        panel_area = st.number_input(
+            "Panel area / face (m²)", 0.001, 0.5, GENESAT_DEFAULTS["panel_area_m2"], 0.001
+        )
+        panel_eff = st.slider("Panel efficiency η", 0.05, 0.38, GENESAT_DEFAULTS["panel_eff"], 0.01)
+        absorp = st.slider("Absorptivity α", 0.1, 1.0, GENESAT_DEFAULTS["absorptivity"], 0.01)
+        emiss = st.slider("Emissivity ε", 0.1, 1.0, GENESAT_DEFAULTS["emissivity"], 0.01)
         target_avgW = GENESAT_DEFAULTS["target_avg_power_W"]
     else:
         altitude_km = st.slider("Altitude (km)", 200.0, 2000.0, 500.0)
-        incl_deg    = st.slider("Inclination (deg)", 0.0, 98.0, 51.6)
-        mass_kg     = st.number_input("Mass (kg)", 0.1, 200.0, 4.0, 0.1)
-        Cd          = st.slider("Drag coefficient Cd", 1.0, 3.5, 2.2, 0.1)
-        panel_area  = st.number_input("Panel area / face (m²)", 0.001, 2.0, 0.05, 0.001)
-        panel_eff   = st.slider("Panel efficiency η", 0.05, 0.38, 0.28, 0.01)
-        absorp      = st.slider("Absorptivity α", 0.1, 1.0, 0.6, 0.01)
-        emiss       = st.slider("Emissivity ε", 0.1, 1.0, 0.8, 0.01)
-        target_avgW = st.number_input("Target avg power (W) for calibration", 0.1, 50.0, 4.5, 0.1)
+        incl_deg = st.slider("Inclination (deg)", 0.0, 98.0, 51.6)
+        mass_kg = st.number_input("Mass (kg)", 0.1, 200.0, 4.0, 0.1)
+        Cd = st.slider("Drag coefficient Cd", 1.0, 3.5, 2.2, 0.1)
+        panel_area = st.number_input("Panel area / face (m²)", 0.001, 2.0, 0.05, 0.001)
+        panel_eff = st.slider("Panel efficiency η", 0.05, 0.38, 0.28, 0.01)
+        absorp = st.slider("Absorptivity α", 0.1, 1.0, 0.6, 0.01)
+        emiss = st.slider("Emissivity ε", 0.1, 1.0, 0.8, 0.01)
+        target_avgW = st.number_input(
+            "Target avg power (W) for calibration", 0.1, 50.0, 4.5, 0.1
+        )
 
     st.header("Attitude & Ops")
     attitude = st.radio("Attitude", ["body-spin", "sun-tracking", "nadir-pointing"])
-    elec_derate = st.slider("Electrical derate (BOL→EOL, MPPT, wiring)", 0.40, 1.00, 0.70, 0.01)
+    elec_derate = st.slider(
+        "Electrical derate (BOL→EOL, MPPT, wiring)", 0.40, 1.00, 0.70, 0.01
+    )
     beta_deg = st.slider("β-angle (deg) — Sun vs. orbital plane", -80.0, 80.0, 0.0, 0.5)
     show_play = st.checkbox("Show Play buttons on plots", True)
     anim_speed = st.slider("Animation speed (Plotly)", 0.1, 5.0, 1.0, 0.1)
@@ -1026,9 +1027,15 @@ with st.sidebar:
 # Build simulator & calibration
 # =========================
 sim = CubeSatSim(
-    altitude_km=altitude_km, incl_deg=incl_deg, mass_kg=mass_kg,
-    Cd=Cd, panel_area_m2=panel_area, panel_eff=panel_eff,
-    absorptivity=absorp, emissivity=emiss, beta_deg=beta_deg
+    altitude_km=altitude_km,
+    incl_deg=incl_deg,
+    mass_kg=mass_kg,
+    Cd=Cd,
+    panel_area_m2=panel_area,
+    panel_eff=panel_eff,
+    absorptivity=absorp,
+    emissivity=emiss,
+    beta_deg=beta_deg,
 )
 sim.set_beta(beta_deg)
 
@@ -1043,15 +1050,17 @@ if auto_cal:
 # =========================
 # Tabs (Verification included)
 # =========================
-tab_orbit, tab_power, tab_thermal, tab_drag, tab_verify, tab_adv, tab_io = st.tabs([
-    "3D + Ground Track (aligned)",
-    "Power",
-    "Thermal",
-    "Drag",
-    "Verification (Heritage)",
-    "Advanced Analysis (Pro)",
-    "Save/Load & Export (Pro)"
-])
+tab_orbit, tab_power, tab_thermal, tab_drag, tab_verify, tab_adv, tab_io = st.tabs(
+    [
+        "3D + Ground Track (aligned)",
+        "Power",
+        "Thermal",
+        "Drag",
+        "Verification (Heritage)",
+        "Advanced Analysis (Pro)",
+        "Save/Load & Export (Pro)",
+    ]
+)
 
 # --- TAB 1: ORBIT ---
 with tab_orbit:
@@ -1074,9 +1083,13 @@ with tab_orbit:
     eclipsed = eclipse_mask_from_vec(x_km, y_km, z_km, sim.S)
 
     x_sun, y_sun, z_sun = x_km.copy(), y_km.copy(), z_km.copy()
-    x_sun[eclipsed] = None; y_sun[eclipsed] = None; z_sun[eclipsed] = None
+    x_sun[eclipsed] = None
+    y_sun[eclipsed] = None
+    z_sun[eclipsed] = None
     x_ecl, y_ecl, z_ecl = x_km.copy(), y_km.copy(), z_km.copy()
-    x_ecl[~eclipsed] = None; y_ecl[~eclipsed] = None; z_ecl[~eclipsed] = None
+    x_ecl[~eclipsed] = None
+    y_ecl[~eclipsed] = None
+    z_ecl[~eclipsed] = None
 
     fig3d = go.Figure()
     uu = np.linspace(0, 2 * np.pi, 60)
@@ -1085,76 +1098,171 @@ with tab_orbit:
     xE = (R_E / 1000.0) * np.cos(UU) * np.sin(VV)
     yE = (R_E / 1000.0) * np.sin(UU) * np.sin(VV)
     zE = (R_E / 1000.0) * np.cos(VV)
-    fig3d.add_trace(go.Surface(x=xE, y=yE, z=zE, opacity=0.35, showscale=False, name="Earth"))
-    fig3d.add_trace(go.Scatter3d(x=x_sun, y=y_sun, z=z_sun, mode="lines",
-                                 line=dict(color="gold", width=4), name="Sunlit"))
-    fig3d.add_trace(go.Scatter3d(x=x_ecl, y=y_ecl, z=z_ecl, mode="lines",
-                                 line=dict(color="gray", width=4), name="Eclipse"))
-    fig3d.add_trace(go.Scatter3d(x=[x_km[0]], y=[y_km[0]], z=[z_km[0]],
-                                 mode="markers", marker=dict(size=6, color="red"),
-                                 name="Sat"))
+    fig3d.add_trace(
+        go.Surface(x=xE, y=yE, z=zE, opacity=0.35, showscale=False, name="Earth")
+    )
+    fig3d.add_trace(
+        go.Scatter3d(
+            x=x_sun,
+            y=y_sun,
+            z=z_sun,
+            mode="lines",
+            line=dict(color="gold", width=4),
+            name="Sunlit",
+        )
+    )
+    fig3d.add_trace(
+        go.Scatter3d(
+            x=x_ecl,
+            y=y_ecl,
+            z=z_ecl,
+            mode="lines",
+            line=dict(color="gray", width=4),
+            name="Eclipse",
+        )
+    )
+    fig3d.add_trace(
+        go.Scatter3d(
+            x=[x_km[0]],
+            y=[y_km[0]],
+            z=[z_km[0]],
+            mode="markers",
+            marker=dict(size=6, color="red"),
+            name="Sat",
+        )
+    )
 
     frames3d = []
     step = 4
     for k in range(0, len(x_km), step):
-        frames3d.append(go.Frame(
-            name=str(k),
-            data=[go.Scatter3d(x=[x_km[k]], y=[y_km[k]], z=[z_km[k]],
-                               mode="markers", marker=dict(size=6, color="red"))],
-            traces=[3]
-        ))
+        frames3d.append(
+            go.Frame(
+                name=str(k),
+                data=[
+                    go.Scatter3d(
+                        x=[x_km[k]],
+                        y=[y_km[k]],
+                        z=[z_km[k]],
+                        mode="markers",
+                        marker=dict(size=6, color="red"),
+                    )
+                ],
+                traces=[3],
+            )
+        )
     fig3d.frames = frames3d
-    fig3d.update_layout(scene=dict(aspectmode="data"),
-                        height=560, showlegend=True,
-                        margin=dict(l=0, r=0, t=0, b=0),
-                        uirevision="keep-earth")
+    fig3d.update_layout(
+        scene=dict(aspectmode="data"),
+        height=560,
+        showlegend=True,
+        margin=dict(l=0, r=0, t=0, b=0),
+        uirevision="keep-earth",
+    )
     if show_play:
         fig3d.update_layout(
-            updatemenus=[dict(
-                type="buttons", direction="left", showactive=False,
-                x=0.05, xanchor="left", y=0.05, yanchor="bottom",
-                pad={"r": 0, "t": 0},
-                buttons=[dict(
-                    label="Play", method="animate",
-                    args=[None, dict(
-                        frame=dict(duration=int(40 / anim_speed), redraw=True),
-                        fromcurrent=True, mode="immediate"
-                    )]
-                )]
-            )]
+            updatemenus=[
+                dict(
+                    type="buttons",
+                    direction="left",
+                    showactive=False,
+                    x=0.05,
+                    xanchor="left",
+                    y=0.05,
+                    yanchor="bottom",
+                    pad={"r": 0, "t": 0},
+                    buttons=[
+                        dict(
+                            label="Play",
+                            method="animate",
+                            args=[
+                                None,
+                                dict(
+                                    frame=dict(
+                                        duration=int(40 / anim_speed), redraw=True
+                                    ),
+                                    fromcurrent=True,
+                                    mode="immediate",
+                                ),
+                            ],
+                        )
+                    ],
+                )
+            ]
         )
     st.plotly_chart(fig3d, use_container_width=True)
 
     fig_gt = go.Figure()
-    fig_gt.add_trace(go.Scattergeo(lon=lon_deg, lat=lat_deg, mode="lines",
-                                   line=dict(color="royalblue", width=2), name="Path"))
-    fig_gt.add_trace(go.Scattergeo(lon=[lon_deg[0]], lat=[lat_deg[0]], mode="markers",
-                                   marker=dict(size=6, color="red"), name="Sat"))
+    fig_gt.add_trace(
+        go.Scattergeo(
+            lon=lon_deg,
+            lat=lat_deg,
+            mode="lines",
+            line=dict(color="royalblue", width=2),
+            name="Path",
+        )
+    )
+    fig_gt.add_trace(
+        go.Scattergeo(
+            lon=[lon_deg[0]],
+            lat=[lat_deg[0]],
+            mode="markers",
+            marker=dict(size=6, color="red"),
+            name="Sat",
+        )
+    )
     frames_gt = []
     for k in range(0, len(lon_deg), step):
-        frames_gt.append(go.Frame(
-            name=str(k),
-            data=[go.Scattergeo(lon=[lon_deg[k]], lat=[lat_deg[k]],
-                                mode="markers", marker=dict(size=6, color="red"))],
-            traces=[1]
-        ))
+        frames_gt.append(
+            go.Frame(
+                name=str(k),
+                data=[
+                    go.Scattergeo(
+                        lon=[lon_deg[k]],
+                        lat=[lat_deg[k]],
+                        mode="markers",
+                        marker=dict(size=6, color="red"),
+                    )
+                ],
+                traces=[1],
+            )
+        )
     fig_gt.frames = frames_gt
-    fig_gt.update_layout(geo=dict(projection_type="natural earth", showland=True),
-                         height=360, margin=dict(t=10), uirevision="keep-gt")
+    fig_gt.update_layout(
+        geo=dict(projection_type="natural earth", showland=True),
+        height=360,
+        margin=dict(t=10),
+        uirevision="keep-gt",
+    )
     if show_play:
         fig_gt.update_layout(
-            updatemenus=[dict(
-                type="buttons", direction="left", showactive=False,
-                x=0.05, xanchor="left", y=0.05, yanchor="bottom",
-                pad={"r": 0, "t": 0},
-                buttons=[dict(
-                    label="Play", method="animate",
-                    args=[None, dict(
-                        frame=dict(duration=int(40 / anim_speed), redraw=True),
-                        fromcurrent=True, mode="immediate"
-                    )]
-                )]
-            )]
+            updatemenus=[
+                dict(
+                    type="buttons",
+                    direction="left",
+                    showactive=False,
+                    x=0.05,
+                    xanchor="left",
+                    y=0.05,
+                    yanchor="bottom",
+                    pad={"r": 0, "t": 0},
+                    buttons=[
+                        dict(
+                            label="Play",
+                            method="animate",
+                            args=[
+                                None,
+                                dict(
+                                    frame=dict(
+                                        duration=int(40 / anim_speed), redraw=True
+                                    ),
+                                    fromcurrent=True,
+                                    mode="immediate",
+                                ),
+                            ],
+                        )
+                    ],
+                )
+            ]
         )
     st.plotly_chart(fig_gt, use_container_width=True)
 
@@ -1162,7 +1270,9 @@ with tab_orbit:
     c1.metric("Orbital period (min)", f"{sim.T_orbit / 60.0:.2f}")
     c2.metric("Eclipse fraction", f"{sim.eclipse_fraction():.3f}")
     c3.metric("Earth view factor", f"{sim.VF:.3f}")
-    st.caption("Tip: increasing |β| shortens/eradicates eclipse; beyond a critical β there's no eclipse.")
+    st.caption(
+        "Tip: increasing |β| shortens/eradicates eclipse; beyond a critical β there's no eclipse."
+    )
 
 
 # --- TAB 2: POWER ---
@@ -1173,7 +1283,9 @@ with tab_power:
     N_orbit = 720
     t_orb, u, x_km, y_km, z_km = sim.orbit_eci(N=N_orbit)
     dt_step = float(t_orb[1] - t_orb[0])
-    P_inst, cos_inc, ecl = sim.instantaneous_power(attitude, t_orb, x_km, y_km, z_km, sim.A_panel, sim.eta)
+    P_inst, cos_inc, ecl = sim.instantaneous_power(
+        attitude, t_orb, x_km, y_km, z_km, sim.A_panel, sim.eta
+    )
     P_inst = P_inst * cal_factor * elec_derate
 
     st.plotly_chart(
@@ -1181,10 +1293,12 @@ with tab_power:
             x=(t_orb / t_orb[-1]) * 360.0,
             y=P_inst,
             labels={"x": "Orbit phase (deg)", "y": "Power (W)"},
-            title=f"Instantaneous Power — {attitude} "
-                  f"(cal {cal_factor:.2f} × derate {elec_derate:.2f} @ β={beta_deg:.1f}°)"
+            title=(
+                f"Instantaneous Power — {attitude} "
+                f"(cal {cal_factor:.2f} × derate {elec_derate:.2f} @ β={beta_deg:.1f}°)"
+            ),
         ),
-        use_container_width=True
+        use_container_width=True,
     )
 
     st.markdown("### β-angle sweep (current attitude)")
@@ -1198,9 +1312,9 @@ with tab_power:
             x="beta_deg",
             y="OAP_W",
             title=f"Orbit-average Power vs β-angle ({attitude})",
-            labels={"beta_deg": "β (deg)", "OAP_W": "Orbit-average Power (W)"}
+            labels={"beta_deg": "β (deg)", "OAP_W": "Orbit-average Power (W)"},
         ),
-        use_container_width=True
+        use_container_width=True,
     )
 
     st.markdown("### Battery & Load (baseline SoC)")
@@ -1210,7 +1324,9 @@ with tab_power:
     eta_chg = st.slider("Charge efficiency η_c", 0.50, 1.00, 0.95, 0.01)
     eta_dis = st.slider("Discharge efficiency η_d", 0.50, 1.00, 0.95, 0.01)
     limit_charge = st.checkbox("Limit charge power", False)
-    P_chg_max = st.slider("Max charge power (W)", 1.0, 200.0, 30.0, 1.0) if limit_charge else None
+    P_chg_max = (
+        st.slider("Max charge power (W)", 1.0, 200.0, 30.0, 1.0) if limit_charge else None
+    )
 
     total_steps = int(np.ceil((mission_days * DAY_SEC) / dt_step))
     reps = int(np.ceil(total_steps / N_orbit))
@@ -1243,7 +1359,9 @@ with tab_power:
         ts_plot = t_timeline / 3600.0
         soc_plot = soc_series
 
-    eod_idx = (np.arange(1, mission_days + 1) * int(np.floor(DAY_SEC / dt_step))).clip(0, total_steps - 1)
+    eod_idx = (np.arange(1, mission_days + 1) * int(np.floor(DAY_SEC / dt_step))).clip(
+        0, total_steps - 1
+    )
     eod_soc = soc_series[eod_idx]
     df_soc_daily = pd.DataFrame({"Day": np.arange(1, len(eod_idx) + 1), "SoC (%)": eod_soc})
 
@@ -1260,9 +1378,9 @@ with tab_power:
             x=ts_plot,
             y=soc_plot,
             labels={"x": "Mission time (hours)", "y": "SoC (%)"},
-            title="Battery SoC (mission time)"
+            title="Battery SoC (mission time)",
         ),
-        use_container_width=True
+        use_container_width=True,
     )
     st.plotly_chart(
         px.line(
@@ -1270,13 +1388,15 @@ with tab_power:
             x="Day",
             y="SoC (%)",
             markers=True,
-            title="Battery SoC — end of each day"
+            title="Battery SoC — end of each day",
         ),
-        use_container_width=True
+        use_container_width=True,
     )
 
     if len(eod_soc) and eod_soc[-1] < 20.0:
-        st.warning("Projected final SoC < 20% — consider more panel area/efficiency, better pointing, or lower load.")
+        st.warning(
+            "Projected final SoC < 20% — consider more panel area/efficiency, better pointing, or lower load."
+        )
     elif len(eod_soc):
         st.success("Battery SoC projection looks acceptable.")
 
@@ -1288,20 +1408,24 @@ with tab_thermal:
     # --- Inputs and basic 1-node result ---
     A_abs = st.number_input(
         "Absorbing area A_abs (m²)",
-        0.001, 2.0,
+        0.001,
+        2.0,
         sim.A_panel,
-        0.001
+        0.001,
     )
     A_rad = st.number_input(
         "Radiating area A_rad (m²)",
-        0.005, 2.0,
+        0.005,
+        2.0,
         6.0 * sim.A_panel,
-        0.005
+        0.005,
     )
     Q_int = st.number_input(
         "Internal dissipation Q_internal (W)",
-        0.0, 50.0,
-        0.0, 0.1
+        0.0,
+        50.0,
+        0.0,
+        0.1,
     )
 
     # Keep Q_int around for Advanced thermal envelope section
@@ -1310,19 +1434,23 @@ with tab_thermal:
     T_c, Qs, Qa, Qir, Qin, Qtot = sim.thermal_equilibrium(
         A_abs=A_abs,
         A_rad=A_rad,
-        Q_internal_W=Q_int
+        Q_internal_W=Q_int,
     )
 
     # Shell temp only in this tab (no interior in 1-node model)
     st.metric("Shell equilibrium temp (°C)", f"{T_c:.2f}")
 
-    dfQ = pd.DataFrame([{
-        "Solar_avg_W": Qs,
-        "Albedo_W": Qa,
-        "Earth_IR_W": Qir,
-        "Internal_W": Qin,
-        "Total_abs_W": Qtot
-    }])
+    dfQ = pd.DataFrame(
+        [
+            {
+                "Solar_avg_W": Qs,
+                "Albedo_W": Qa,
+                "Earth_IR_W": Qir,
+                "Internal_W": Qin,
+                "Total_abs_W": Qtot,
+            }
+        ]
+    )
 
     # --- Visuals: CubeSat rectangle + compact gauge ---
     cube_col, gauge_col = st.columns([1, 1.4])
@@ -1368,26 +1496,28 @@ with tab_thermal:
         temp_min = -40.0
         temp_max = 80.0
 
-        fig_gauge = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=T_c,
-            number={"suffix": " °C", "font": {"size": 28}},
-            title={"text": "Shell Equilibrium Temp", "font": {"size": 16}, "align": "center"},
-            gauge={
-                "axis": {"range": [temp_min, temp_max], "tickwidth": 1},
-                "bar": {"color": "#f97316"},
-                "steps": [
-                    {"range": [temp_min, -10], "color": "#0ea5e9"},
-                    {"range": [-10, 40], "color": "#22c55e"},
-                    {"range": [40, temp_max], "color": "#ef4444"},
-                ],
-                "threshold": {
-                    "line": {"color": "#111827", "width": 3},
-                    "thickness": 0.75,
-                    "value": T_c,
+        fig_gauge = go.Figure(
+            go.Indicator(
+                mode="gauge+number",
+                value=T_c,
+                number={"suffix": " °C", "font": {"size": 28}},
+                title={"text": "Shell Equilibrium Temp", "font": {"size": 16}, "align": "center"},
+                gauge={
+                    "axis": {"range": [temp_min, temp_max], "tickwidth": 1},
+                    "bar": {"color": "#f97316"},
+                    "steps": [
+                        {"range": [temp_min, -10], "color": "#0ea5e9"},
+                        {"range": [-10, 40], "color": "#22c55e"},
+                        {"range": [40, temp_max], "color": "#ef4444"},
+                    ],
+                    "threshold": {
+                        "line": {"color": "#111827", "width": 3},
+                        "thickness": 0.75,
+                        "value": T_c,
+                    },
                 },
-            },
-        ))
+            )
+        )
 
         fig_gauge.update_layout(
             margin=dict(l=10, r=10, t=10, b=10),
@@ -1407,9 +1537,9 @@ with tab_thermal:
             dfQ.melt(var_name="Component", value_name="W"),
             x="Component",
             y="W",
-            title="Absorbed power components (current β)"
+            title="Absorbed power components (current β)",
         ),
-        use_container_width=True
+        use_container_width=True,
     )
 
 
@@ -1425,9 +1555,9 @@ with tab_drag:
             x="Day",
             y="Altitude (km)",
             markers=True,
-            title="Altitude decay over mission"
+            title="Altitude decay over mission",
         ),
-        use_container_width=True
+        use_container_width=True,
     )
 
 
@@ -1451,7 +1581,7 @@ with tab_verify:
             "Inclination (deg)": GENESAT_REF["inc_deg"],
             "Orbital period (min)": GENESAT_REF["period_min"],
             "OAP (W)": GENESAT_REF["oap_W"],
-            "Notes": "NASA/Ames 3U biology CubeSat; LEO, ~416.5 km, ~40°"
+            "Notes": "NASA/Ames 3U biology CubeSat; LEO, ~416.5 km, ~40°",
         },
         {
             "Mission": "PharmaSat",
@@ -1459,7 +1589,7 @@ with tab_verify:
             "Inclination (deg)": PHARMASAT_REF["inc_deg"],
             "Orbital period (min)": PHARMASAT_REF["period_min"],
             "OAP (W)": PHARMASAT_REF["oap_W"],
-            "Notes": "Ames biology mission; similar bus to GeneSat-1"
+            "Notes": "Ames biology mission; similar bus to GeneSat-1",
         },
         {
             "Mission": "O/OREOS",
@@ -1467,13 +1597,15 @@ with tab_verify:
             "Inclination (deg)": OOREOS_REF["inc_deg"],
             "Orbital period (min)": OOREOS_REF["period_min"],
             "OAP (W)": OOREOS_REF["oap_W"],
-            "Notes": "Ames 3U; higher-altitude comparison point"
+            "Notes": "Ames 3U; higher-altitude comparison point",
         },
     ]
     df_herit = pd.DataFrame(heritage_rows)
     st.markdown("### Heritage reference values")
     st.dataframe(df_herit, use_container_width=True)
-    st.caption("OAP = orbit-average power. Values above are representative; refer to mission ODAR/papers for final numbers.")
+    st.caption(
+        "OAP = orbit-average power. Values above are representative; refer to mission ODAR/papers for final numbers."
+    )
 
     # Helper for relative error
     def rel_err(val, ref):
@@ -1506,26 +1638,28 @@ with tab_verify:
     oap_g_cal = oap_g_raw * cal_g  # this will match 4.5 W within floating-point
     period_g_min = sim_g.T_orbit / 60.0
 
-    df_cal = pd.DataFrame([
-        {
-            "Quantity": "Mean altitude (km)",
-            "CATSIM (GeneSat-1 mode)": sim_g.alt_km,
-            "GeneSat-1 reference": GENESAT_REF["alt_km"],
-            "Rel. diff vs ref (%)": rel_err(sim_g.alt_km, GENESAT_REF["alt_km"]),
-        },
-        {
-            "Quantity": "Orbital period (min)",
-            "CATSIM (GeneSat-1 mode)": period_g_min,
-            "GeneSat-1 reference": GENESAT_REF["period_min"],
-            "Rel. diff vs ref (%)": rel_err(period_g_min, GENESAT_REF["period_min"]),
-        },
-        {
-            "Quantity": "Orbit-avg power (W, calibrated — pre-derate)",
-            "CATSIM (GeneSat-1 mode)": oap_g_cal,
-            "GeneSat-1 reference": GENESAT_REF["oap_W"],
-            "Rel. diff vs ref (%)": rel_err(oap_g_cal, GENESAT_REF["oap_W"]),
-        },
-    ])
+    df_cal = pd.DataFrame(
+        [
+            {
+                "Quantity": "Mean altitude (km)",
+                "CATSIM (GeneSat-1 mode)": sim_g.alt_km,
+                "GeneSat-1 reference": GENESAT_REF["alt_km"],
+                "Rel. diff vs ref (%)": rel_err(sim_g.alt_km, GENESAT_REF["alt_km"]),
+            },
+            {
+                "Quantity": "Orbital period (min)",
+                "CATSIM (GeneSat-1 mode)": period_g_min,
+                "GeneSat-1 reference": GENESAT_REF["period_min"],
+                "Rel. diff vs ref (%)": rel_err(period_g_min, GENESAT_REF["period_min"]),
+            },
+            {
+                "Quantity": "Orbit-avg power (W, calibrated — pre-derate)",
+                "CATSIM (GeneSat-1 mode)": oap_g_cal,
+                "GeneSat-1 reference": GENESAT_REF["oap_W"],
+                "Rel. diff vs ref (%)": rel_err(oap_g_cal, GENESAT_REF["oap_W"]),
+            },
+        ]
+    )
 
     st.dataframe(df_cal, use_container_width=True)
     st.caption(
@@ -1542,7 +1676,7 @@ with tab_adv:
 
     if plan_effective != "pro":
         st.info(
-            "🔒 Advanced Analysis is available on the Pro plan ($9.99/mo).\n\n"
+            "🔒 Advanced Analysis is available on the Pro plan ($19.99/mo).\n\n"
             "Your 30-day trial provides Standard features only."
         )
         st.markdown(
@@ -1562,11 +1696,13 @@ with tab_adv:
         for att in att_list:
             for b in betas_adv:
                 oap_val = sim.avg_power_at_beta(att, b, sim.A_panel, sim.eta)
-                rows.append({
-                    "beta_deg": b,
-                    "OAP_W": oap_val * cal_factor * elec_derate,
-                    "Attitude": att
-                })
+                rows.append(
+                    {
+                        "beta_deg": b,
+                        "OAP_W": oap_val * cal_factor * elec_derate,
+                        "Attitude": att,
+                    }
+                )
         df_multi_beta = pd.DataFrame(rows)
         fig_multi_beta = px.line(
             df_multi_beta,
@@ -1574,7 +1710,7 @@ with tab_adv:
             y="OAP_W",
             color="Attitude",
             labels={"beta_deg": "β (deg)", "OAP_W": "Orbit-average Power (W)"},
-            title="Orbit-average Power vs β for Multiple Attitudes"
+            title="Orbit-average Power vs β for Multiple Attitudes",
         )
         st.plotly_chart(fig_multi_beta, use_container_width=True)
 
@@ -1583,7 +1719,9 @@ with tab_adv:
         N_orbit_adv = 720
         t_orb_adv, u_adv, x_km_adv, y_km_adv, z_km_adv = sim.orbit_eci(N=N_orbit_adv)
         dt_adv = float(t_orb_adv[1] - t_orb_adv[0])
-        P_inst_adv, _, _ = sim.instantaneous_power(attitude, t_orb_adv, x_km_adv, y_km_adv, z_km_adv, sim.A_panel, sim.eta)
+        P_inst_adv, _, _ = sim.instantaneous_power(
+            attitude, t_orb_adv, x_km_adv, y_km_adv, z_km_adv, sim.A_panel, sim.eta
+        )
         P_inst_adv = P_inst_adv * cal_factor * elec_derate
 
         total_steps_adv = int(np.ceil((mission_days * DAY_SEC) / dt_adv))
@@ -1598,7 +1736,7 @@ with tab_adv:
             load = cons_W
             if gen >= load:
                 P_surplus = gen - load
-                if 'P_chg_max' in locals() and P_chg_max is not None:
+                if "P_chg_max" in locals() and P_chg_max is not None:
                     P_surplus = min(P_surplus, P_chg_max)
                 dE_Wh = (P_surplus * eta_chg) * dt_adv / 3600.0
                 soc_wh_adv = min(soc_wh_adv + dE_Wh, batt_Wh)
@@ -1614,9 +1752,9 @@ with tab_adv:
                 x=ts_plot_adv,
                 y=soc_series_adv,
                 labels={"x": "Mission time (hours)", "y": "SoC (%)"},
-                title="Multi-orbit Battery SoC — mission timeline"
+                title="Multi-orbit Battery SoC — mission timeline",
             ),
-            use_container_width=True
+            use_container_width=True,
         )
 
         # 3. Thermal envelope vs β
@@ -1624,7 +1762,9 @@ with tab_adv:
         betas_th = np.linspace(-80, 80, 65)
         temps_eq = []
         for b in betas_th:
-            T_eq_b, *_ = sim.thermal_equilibrium(A_abs=A_abs, A_rad=A_rad, Q_internal_W=Q_int, beta_for_thermal=b)
+            T_eq_b, *_ = sim.thermal_equilibrium(
+                A_abs=A_abs, A_rad=A_rad, Q_internal_W=Q_int, beta_for_thermal=b
+            )
             temps_eq.append(T_eq_b)
         df_temp = pd.DataFrame({"beta_deg": betas_th, "T_eq_C": temps_eq})
         fig_temp = px.line(
@@ -1632,47 +1772,56 @@ with tab_adv:
             x="beta_deg",
             y="T_eq_C",
             labels={"beta_deg": "β (deg)", "T_eq_C": "Equilibrium Temp (°C)"},
-            title="Equilibrium Temperature vs β"
+            title="Equilibrium Temperature vs β",
         )
         st.plotly_chart(fig_temp, use_container_width=True)
 
         c_min, c_max = st.columns(2)
         c_min.metric("Min T_eq over β (°C)", f"{df_temp['T_eq_C'].min():.1f}")
         c_max.metric("Max T_eq over β (°C)", f"{df_temp['T_eq_C'].max():.1f}")
+
         # 3b. Two-node Thermal Analysis (shell + interior)
         st.markdown("### 3b. Two-node Thermal Analysis (Shell + Interior)")
 
         A_abs_2 = st.number_input(
             "Absorbing area A_abs (m²) — 2-node thermal",
-            0.001, 2.0,
+            0.001,
+            2.0,
             sim.A_panel,
             0.001,
-            key="th2_A_abs"
+            key="th2_A_abs",
         )
         A_rad_2 = st.number_input(
             "Radiating area A_rad (m²) — 2-node thermal",
-            0.005, 2.0,
+            0.005,
+            2.0,
             6.0 * sim.A_panel,
             0.005,
-            key="th2_A_rad"
+            key="th2_A_rad",
         )
         Q_int_total_2 = st.number_input(
             "Total internal dissipation Q_internal (W) — 2-node thermal",
-            0.0, 50.0,
-            5.0, 0.1,
-            key="th2_Q"
+            0.0,
+            50.0,
+            5.0,
+            0.1,
+            key="th2_Q",
         )
         frac_int_2 = st.slider(
             "Fraction of internal power in interior node",
-            0.0, 1.0,
-            0.8, 0.05,
-            key="th2_frac"
+            0.0,
+            1.0,
+            0.8,
+            0.05,
+            key="th2_frac",
         )
         k_cond_2 = st.slider(
             "Conduction between shell and interior (W/K)",
-            0.1, 10.0,
-            1.0, 0.1,
-            key="th2_kcond"
+            0.1,
+            10.0,
+            1.0,
+            0.1,
+            key="th2_kcond",
         )
 
         Q_int_int_2 = Q_int_total_2 * frac_int_2
@@ -1693,15 +1842,19 @@ with tab_adv:
         c_ts2.metric("Shell equilibrium temp (°C)", f"{T_shell_C_2:.2f}")
         c_ti2.metric("Interior equilibrium temp (°C)", f"{T_int_C_2:.2f}")
 
-        dfQ2 = pd.DataFrame([{
-            "Solar_shell_W": thermo_diag_2["Q_solar_shell_W"],
-            "Albedo_shell_W": thermo_diag_2["Q_albedo_shell_W"],
-            "Earth_IR_shell_W": thermo_diag_2["Q_ir_shell_W"],
-            "Internal_shell_W": thermo_diag_2["Q_int_shell_W"],
-            "Internal_interior_W": thermo_diag_2["Q_int_interior_W"],
-            "Shell_rad_to_space_W": thermo_diag_2["Q_rad_shell_W"],
-            "Cond_from_interior_W": thermo_diag_2["Q_cond_shell_W"],
-        }])
+        dfQ2 = pd.DataFrame(
+            [
+                {
+                    "Solar_shell_W": thermo_diag_2["Q_solar_shell_W"],
+                    "Albedo_shell_W": thermo_diag_2["Q_albedo_shell_W"],
+                    "Earth_IR_shell_W": thermo_diag_2["Q_ir_shell_W"],
+                    "Internal_shell_W": thermo_diag_2["Q_int_shell_W"],
+                    "Internal_interior_W": thermo_diag_2["Q_int_interior_W"],
+                    "Shell_rad_to_space_W": thermo_diag_2["Q_rad_shell_W"],
+                    "Cond_from_interior_W": thermo_diag_2["Q_cond_shell_W"],
+                }
+            ]
+        )
 
         st.dataframe(dfQ2, use_container_width=True)
         st.plotly_chart(
@@ -1709,17 +1862,21 @@ with tab_adv:
                 dfQ2.melt(var_name="Component", value_name="W"),
                 x="Component",
                 y="W",
-                title="Two-node thermal power balance (shell + interior)"
+                title="Two-node thermal power balance (shell + interior)",
             ),
-            use_container_width=True
+            use_container_width=True,
         )
 
         # 4. Ground-track density map
         st.markdown("### 4. Ground-track Density Map")
-        dens_days = st.slider("Days for density map", 1, min(60, mission_days), min(7, mission_days))
+        dens_days = st.slider(
+            "Days for density map", 1, min(60, mission_days), min(7, mission_days)
+        )
         num_orbits_dens = max(1, int(np.ceil(dens_days * DAY_SEC / sim.T_orbit)))
 
-        t_long, u_long, x_long, y_long, z_long = sim.long_orbit_eci(num_orbits=num_orbits_dens, N_per_orbit=360)
+        t_long, u_long, x_long, y_long, z_long = sim.long_orbit_eci(
+            num_orbits=num_orbits_dens, N_per_orbit=360
+        )
         lon_long, lat_long = sim.ground_track_from_eci(t_long, x_long, y_long, z_long)
 
         df_dens = pd.DataFrame({"lon": lon_long, "lat": lat_long})
@@ -1730,22 +1887,28 @@ with tab_adv:
             nbinsx=72,
             nbinsy=36,
             labels={"lon": "Longitude (deg)", "lat": "Latitude (deg)"},
-            title=f"Ground-track Density over ~{dens_days} days"
+            title=f"Ground-track Density over ~{dens_days} days",
         )
         st.plotly_chart(fig_dens, use_container_width=True)
 
         # 5. Orbit lifetime curve (drag decay)
         st.markdown("### 5. Orbit Lifetime Curve (Drag Decay)")
-        lifetime_days = st.slider("Lifetime analysis (days)", mission_days, 3650, max(mission_days, 365))
-        A_drag_adv = st.number_input("Drag area A_drag (m²) for lifetime", 0.001, 2.0, sim.A_panel, 0.001)
+        lifetime_days = st.slider(
+            "Lifetime analysis (days)", mission_days, 3650, max(mission_days, 365)
+        )
+        A_drag_adv = st.number_input(
+            "Drag area A_drag (m²) for lifetime", 0.001, 2.0, sim.A_panel, 0.001
+        )
 
         alt_series_adv = sim.drag_decay_days(lifetime_days, A_drag=A_drag_adv)
-        df_alt_adv = pd.DataFrame({"Day": np.arange(1, lifetime_days + 1), "Altitude (km)": alt_series_adv})
+        df_alt_adv = pd.DataFrame(
+            {"Day": np.arange(1, lifetime_days + 1), "Altitude (km)": alt_series_adv}
+        )
         fig_alt_adv = px.line(
             df_alt_adv,
             x="Day",
             y="Altitude (km)",
-            title="Orbit Lifetime Curve (Altitude vs Day)"
+            title="Orbit Lifetime Curve (Altitude vs Day)",
         )
         st.plotly_chart(fig_alt_adv, use_container_width=True)
 
@@ -1815,7 +1978,7 @@ with tab_io:
 
     if plan_effective != "pro":
         st.info(
-            "🔒 Save/Load & Export are available on the Pro plan ($9.99/mo).\n\n"
+            "🔒 Save/Load & Export are available on the Pro plan ($19.99/mo).\n\n"
             "Your 30-day trial provides Standard features only."
         )
         st.write("- Save mission parameters to JSON")
@@ -1824,38 +1987,48 @@ with tab_io:
         st.write("Upgrade to Pro in the sidebar to unlock.")
     else:
         mission_params = {
-            "altitude_km": altitude_km, "incl_deg": incl_deg,
-            "mass_kg": mass_kg, "Cd": Cd,
-            "panel_area_m2": panel_area, "panel_eff": panel_eff,
-            "absorptivity": absorp, "emissivity": emiss,
-            "attitude": attitude, "auto_cal": auto_cal,
-            "elec_derate": elec_derate, "beta_deg": beta_deg
+            "altitude_km": altitude_km,
+            "incl_deg": incl_deg,
+            "mass_kg": mass_kg,
+            "Cd": Cd,
+            "panel_area_m2": panel_area,
+            "panel_eff": panel_eff,
+            "absorptivity": absorp,
+            "emissivity": emiss,
+            "attitude": attitude,
+            "auto_cal": auto_cal,
+            "elec_derate": elec_derate,
+            "beta_deg": beta_deg,
         }
         json_bytes = json.dumps(mission_params, indent=2).encode("utf-8")
         st.download_button(
             "Download Mission JSON",
             data=json_bytes,
             file_name="mission.json",
-            mime="application/json"
+            mime="application/json",
         )
 
         t_orb2, u_orb, x_orb, y_orb, z_orb = sim.orbit_eci(N=720)
-        P_orb, _, _ = sim.instantaneous_power(attitude, t_orb2, x_orb, y_orb, z_orb, sim.A_panel, sim.eta)
+        P_orb, _, _ = sim.instantaneous_power(
+            attitude, t_orb2, x_orb, y_orb, z_orb, sim.A_panel, sim.eta
+        )
         P_orb = P_orb * cal_factor * elec_derate
 
-        df_orbit = pd.DataFrame({
-            "t_sec": t_orb2,
-            "x_eci_km": x_orb,
-            "y_eci_km": y_orb,
-            "z_eci_km": z_orb
-        })
+        df_orbit = pd.DataFrame(
+            {
+                "t_sec": t_orb2,
+                "x_eci_km": x_orb,
+                "y_eci_km": y_orb,
+                "z_eci_km": z_orb,
+            }
+        )
         buf_orbit = io.StringIO()
         df_orbit.to_csv(buf_orbit, index=False)
         st.download_button(
             "Export One-Orbit ECI CSV",
             buf_orbit.getvalue(),
             file_name="orbit_one_orbit.csv",
-            mime="text/csv"
+            mime="text/csv",
         )
 
         df_power_orbit = pd.DataFrame({"t_sec": t_orb2, "power_W": P_orb})
@@ -1865,7 +2038,7 @@ with tab_io:
             "Export One-Orbit Power CSV",
             buf_porb.getvalue(),
             file_name="power_one_orbit.csv",
-            mime="text/csv"
+            mime="text/csv",
         )
 
 # =========================
@@ -1880,5 +2053,5 @@ st.markdown(
     <a href="mailto:support@clevelandaerospace.com">support@clevelandaerospace.com</a>
     </p>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
