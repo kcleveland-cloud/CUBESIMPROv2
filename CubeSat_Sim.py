@@ -884,63 +884,107 @@ st.session_state.trial_end = trial_end.isoformat()
 # Sidebar controls (including plan UI)
 # =========================
 with st.sidebar:
-    st.header("Account")
+    # -------------------------
+    # Account
+    # -------------------------
+    st.markdown("### Account")
 
     auth_email = (user or {}).get("email", "unknown")
     auth_name = (user or {}).get("name", "")
     auth_pic = (user or {}).get("picture")
 
-    if auth_pic:
-        st.image(auth_pic, width=64)
-    if auth_name:
-        st.markdown(f"**{auth_name}**")
-    st.caption(auth_email)
+    acct_col1, acct_col2 = st.columns([1, 2])
+    with acct_col1:
+        if auth_pic:
+            st.image(auth_pic, width=64)
+        else:
+            st.markdown("🛰️")
+    with acct_col2:
+        if auth_name:
+            st.markdown(f"**{auth_name}**")
+        st.caption(auth_email)
 
-    st.header("Plan & Billing")
+    st.divider()
 
-    # Dev-only simulated plan controls
+    # -------------------------
+    # Plan & Billing
+    # -------------------------
+    st.markdown("### Plan & Billing")
+
+    # Dev-only simulated plan controls (collapsed)
     if CONFIG.get("SHOW_DEV_PLAN_SIM", False):
+        with st.expander("Developer: simulate subscription", expanded=False):
+            st.markdown(
+                "<div style='font-size:0.75rem; color:#888;'>"
+                "Overrides the real subscription in dev only."
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+            dev_choice = st.radio(
+                "Simulated plan",
+                ["Use real plan", "Trial", "Standard", "Pro"],
+                index=0,
+                key="dev_plan_choice",
+            )
+
+            if st.button("Apply dev plan"):
+                if dev_choice == "Trial":
+                    st.session_state.plan_base = "trial"
+                    st.session_state.trial_start = dt.date.today().isoformat()
+                elif dev_choice == "Standard":
+                    st.session_state.plan_base = "standard"
+                elif dev_choice == "Pro":
+                    st.session_state.plan_base = "pro"
+                # "Use real plan" just leaves things as-is
+                st.rerun()
+
+    # Current plan badge
+    if st.session_state.in_trial:
         st.markdown(
-            "<div style='font-size:0.75rem; color:#888;'>Dev only: simulate subscription</div>",
+            f"""
+            <div style="
+                padding:0.6rem 0.8rem;
+                border-radius:0.75rem;
+                background:rgba(59,130,246,0.08);
+                border:1px solid rgba(59,130,246,0.35);
+                font-size:0.85rem;
+            ">
+                <strong>Current plan:</strong> 🧪 Trial (Standard)<br>
+                Ends: <strong>{st.session_state.trial_end}</strong>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
-
-        dev_choice = st.radio(
-            "Simulated plan",
-            ["Use real plan", "Trial", "Standard", "Pro"],
-            index=0,
-            key="dev_plan_choice",
-            label_visibility="collapsed",
-        )
-
-        if st.button("Apply dev plan"):
-            if dev_choice == "Trial":
-                st.session_state.plan_base = "trial"
-                st.session_state.trial_start = dt.date.today().isoformat()
-            elif dev_choice == "Standard":
-                st.session_state.plan_base = "standard"
-            elif dev_choice == "Pro":
-                st.session_state.plan_base = "pro"
-            st.rerun()
-
-    if st.session_state.in_trial:
-        st.markdown(f"**Current plan:** 🧪 Trial (Standard) — ends {st.session_state.trial_end}")
         st.caption(
-            "During your 30-day free trial you have full access to Standard features.\n\n"
+            "30-day free trial includes full Standard features. "
             "Pro features (Advanced Analysis, Save/Load & Export) require a Pro subscription."
         )
     else:
         label = st.session_state.plan_base.capitalize()
-        st.markdown(f"**Current plan:** {label}")
+        st.markdown(
+            f"""
+            <div style="
+                padding:0.6rem 0.8rem;
+                border-radius:0.75rem;
+                background:rgba(15,23,42,0.03);
+                border:1px solid rgba(148,163,184,0.5);
+                font-size:0.85rem;
+            ">
+                <strong>Current plan:</strong> {label}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    # Pricing caption (stays in sidebar)
+    # Short pricing reminder
     st.caption(
-        "Pricing (draft): Standard $9.99/mo • Pro $19.99/mo • Academic Pro $99/yr • Department $499/yr"
+        "Draft pricing: Standard $9.99/mo • Pro $19.99/mo • Academic Pro $99/yr • Department $499/yr"
     )
 
-    # ----- Dev-only pricing summary (for copy tuning) -----
+    # Dev-only long pricing copy (collapsed)
     if DEV_MODE:
-        with st.expander("🧭 Final Pricing Structure (dev only)", expanded=False):
+        with st.expander("🧭 Full pricing structure (dev)", expanded=False):
             st.markdown(
                 """
 **Free Trial**
@@ -948,7 +992,7 @@ with st.sidebar:
 - Full Standard + optional 7-day Pro preview  
 
 **Standard — $9.99/mo or $99/yr**
-- Perfect for students and hobbyists.  
+- For students, hobbyists, early CubeSat teams.  
 
 **Pro — $19.99/mo or $199/yr**
 - For smallsat startups, SBIR teams, and professional engineers.  
@@ -961,51 +1005,81 @@ with st.sidebar:
                 """
             )
 
-    # ----- Upgrade controls (stubbed) -----
-    if st.session_state.plan_base != "pro":
-        st.markdown("**Upgrade options (stubbed):**")
-        col_a, col_b = st.columns(2)
+    # -------------------------
+    # Upgrade controls
+    # -------------------------
+    st.divider()
+    st.markdown("### Upgrade")
 
+    if st.session_state.plan_base != "pro":
+        st.markdown("**Choose a plan:**")
+
+        col_a, col_b = st.columns(2)
         with col_a:
             if st.button("Standard $9.99/mo"):
                 st.session_state.plan_base = "standard"
                 st.rerun()
-
         with col_b:
             if st.button("🚀 Go Pro $19.99/mo", type="primary"):
                 st.session_state.plan_base = "pro"
                 st.rerun()
 
-        st.caption(
-            "In production, these buttons would redirect to Stripe Checkout (monthly or annual)."
-        )
+        st.caption("In production, these buttons will redirect to Stripe Checkout.")
     else:
         st.success("✅ You are on the Pro plan.")
 
-    # ---- Everything below here stays in the SIDEBAR ----
-    st.header("Preset & Validation")
-    use_genesat = st.checkbox("Load GeneSat-1 defaults", True)
-    auto_cal = st.checkbox("Calibrate avg power to GeneSat target (~4.5 W)", True)
+    # -------------------------
+    # Simulation Setup
+    # -------------------------
+    st.divider()
+    st.markdown("### Simulation setup")
 
-    st.header("Mission Parameters")
+    # Preset & validation
+    with st.expander("Preset & validation", expanded=True):
+        use_genesat = st.checkbox("Load GeneSat-1 defaults", True)
+        auto_cal = st.checkbox("Calibrate avg power to GeneSat target (~4.5 W)", True)
+
+    # Mission parameters
+    st.markdown("#### Mission parameters")
+
     if use_genesat:
-        altitude_km = st.slider("Altitude (km)", 200.0, 700.0, GENESAT_DEFAULTS["altitude_km"])
-        incl_deg = st.slider("Inclination (deg)", 0.0, 98.0, GENESAT_DEFAULTS["incl_deg"])
-        mass_kg = st.number_input("Mass (kg)", 0.1, 50.0, GENESAT_DEFAULTS["mass_kg"], 0.1)
-        Cd = st.slider("Drag coefficient Cd", 1.5, 3.0, GENESAT_DEFAULTS["Cd"], 0.1)
-        panel_area = st.number_input(
-            "Panel area / face (m²)", 0.001, 0.5, GENESAT_DEFAULTS["panel_area_m2"], 0.001
+        altitude_km = st.slider(
+            "Altitude (km)", 200.0, 700.0, GENESAT_DEFAULTS["altitude_km"]
         )
-        panel_eff = st.slider("Panel efficiency η", 0.05, 0.38, GENESAT_DEFAULTS["panel_eff"], 0.01)
-        absorp = st.slider("Absorptivity α", 0.1, 1.0, GENESAT_DEFAULTS["absorptivity"], 0.01)
-        emiss = st.slider("Emissivity ε", 0.1, 1.0, GENESAT_DEFAULTS["emissivity"], 0.01)
+        incl_deg = st.slider(
+            "Inclination (deg)", 0.0, 98.0, GENESAT_DEFAULTS["incl_deg"]
+        )
+        mass_kg = st.number_input(
+            "Mass (kg)", 0.1, 50.0, GENESAT_DEFAULTS["mass_kg"], 0.1
+        )
+        Cd = st.slider(
+            "Drag coefficient Cd", 1.5, 3.0, GENESAT_DEFAULTS["Cd"], 0.1
+        )
+        panel_area = st.number_input(
+            "Panel area / face (m²)",
+            0.001,
+            0.5,
+            GENESAT_DEFAULTS["panel_area_m2"],
+            0.001,
+        )
+        panel_eff = st.slider(
+            "Panel efficiency η", 0.05, 0.38, GENESAT_DEFAULTS["panel_eff"], 0.01
+        )
+        absorp = st.slider(
+            "Absorptivity α", 0.1, 1.0, GENESAT_DEFAULTS["absorptivity"], 0.01
+        )
+        emiss = st.slider(
+            "Emissivity ε", 0.1, 1.0, GENESAT_DEFAULTS["emissivity"], 0.01
+        )
         target_avgW = GENESAT_DEFAULTS["target_avg_power_W"]
     else:
         altitude_km = st.slider("Altitude (km)", 200.0, 2000.0, 500.0)
         incl_deg = st.slider("Inclination (deg)", 0.0, 98.0, 51.6)
         mass_kg = st.number_input("Mass (kg)", 0.1, 200.0, 4.0, 0.1)
         Cd = st.slider("Drag coefficient Cd", 1.0, 3.5, 2.2, 0.1)
-        panel_area = st.number_input("Panel area / face (m²)", 0.001, 2.0, 0.05, 0.001)
+        panel_area = st.number_input(
+            "Panel area / face (m²)", 0.001, 2.0, 0.05, 0.001
+        )
         panel_eff = st.slider("Panel efficiency η", 0.05, 0.38, 0.28, 0.01)
         absorp = st.slider("Absorptivity α", 0.1, 1.0, 0.6, 0.01)
         emiss = st.slider("Emissivity ε", 0.1, 1.0, 0.8, 0.01)
@@ -1013,15 +1087,22 @@ with st.sidebar:
             "Target avg power (W) for calibration", 0.1, 50.0, 4.5, 0.1
         )
 
-    st.header("Attitude & Ops")
-    attitude = st.radio("Attitude", ["body-spin", "sun-tracking", "nadir-pointing"])
+    # Attitude & ops
+    st.markdown("#### Attitude & ops")
+
+    attitude = st.radio(
+        "Attitude", ["body-spin", "sun-tracking", "nadir-pointing"], horizontal=False
+    )
     elec_derate = st.slider(
         "Electrical derate (BOL→EOL, MPPT, wiring)", 0.40, 1.00, 0.70, 0.01
     )
-    beta_deg = st.slider("β-angle (deg) — Sun vs. orbital plane", -80.0, 80.0, 0.0, 0.5)
+    beta_deg = st.slider(
+        "β-angle (deg) — Sun vs. orbital plane", -80.0, 80.0, 0.0, 0.5
+    )
     show_play = st.checkbox("Show Play buttons on plots", True)
     anim_speed = st.slider("Animation speed (Plotly)", 0.1, 5.0, 1.0, 0.1)
     mission_days = st.slider("Mission duration (days)", 1, 365, 60)
+
 
 # =========================
 # Build simulator & calibration
