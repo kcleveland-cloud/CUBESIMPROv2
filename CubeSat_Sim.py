@@ -28,7 +28,7 @@ CONFIG = {
             "AUTH0_CLIENT_SECRET_DEV",
             "E9BAjy7QLsJ0GSAYPMoBvb-vg7lMeLObKBqdsBupoQoVcVUHM75hmXOSDm2jzuw7",
         ),
-        "AUTH0_CALLBACK_URL": "https://cubesimprov2-lt6hcgkvpdvygnwbktyqdg.streamlit.app",
+        "AUTH0_CALLBACK_URL": "https://cubesimprov2-noruuoxdtsrjzdskhuobbr.streamlit.app",
         # Show dev-only controls like simulated plan selector
         "SHOW_DEV_PLAN_SIM": True,
     },
