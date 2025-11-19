@@ -150,6 +150,9 @@ def get_user():
     return None
 
 
+# =========================
+# Brand CSS + Green buttons
+# =========================
 def inject_brand_css():
     st.markdown(
         """
@@ -158,8 +161,6 @@ def inject_brand_css():
             --primary-color: #1d4ed8 !important;
             --primaryColor: #1d4ed8 !important;
         }
-
-        /* Top nav bar */
         .cats-nav {
             background: #020617;
             padding: 0.4rem 1.2rem;
@@ -171,45 +172,41 @@ def inject_brand_css():
             gap: 1rem;
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
-        .cats-nav a {
-            color: #e5e7eb;
-            text-decoration: none;
-            font-size: 0.9rem;
-        }
-        .cats-nav a:hover {
-            color: #38bdf8;
-        }
+        .cats-nav a { color: #e5e7eb; text-decoration: none; font-size: 0.9rem; }
+        .cats-nav a:hover { color: #38bdf8; }
 
-        .dataframe th, .dataframe td {
-            font-size: 0.85rem !important;
-        }
-
-        /* GLOBAL PRIMARY buttons (e.g., Go Pro) — blue */
-        button[kind="primary"],
-        button[data-testid="baseButton-primary"] {
+        button[kind="primary"], button[data-testid="baseButton-primary"] {
             background-color: #1d4ed8 !important;
             border-color: #1d4ed8 !important;
             color: #ffffff !important;
         }
-        button[kind="primary"]:hover,
-        button[data-testid="baseButton-primary"]:hover {
+        button[kind="primary"]:hover, button[data-testid="baseButton-primary"]:hover {
             background-color: #1e40af !important;
             border-color: #1e40af !important;
-            color: #ffffff !important;
-        }
-
-        /* SIDEBAR secondary buttons (Standard, Academic, Dept, etc.) — FORCE GREEN */
-        div[data-testid="stSidebar"] button[data-testid="baseButton-secondary"] {
-            background-color: #16a34a !important;   /* green-600 */
-            border-color: #16a34a !important;
-            color: #ffffff !important;
-        }
-        div[data-testid="stSidebar"] button[data-testid="baseButton-secondary"]:hover {
-            background-color: #15803d !important;   /* green-700 */
-            border-color: #15803d !important;
-            color: #ffffff !important;
         }
         </style>
+
+        <script>
+        setTimeout(() => {
+            const buttons = Array.from(parent.document.querySelectorAll('button[kind="secondary"]'));
+            buttons.forEach(btn => {
+                const text = btn.innerText.trim();
+                if (text === "Academic Pro $99/yr" || text === "Dept License $499/yr") {
+                    btn.style.backgroundColor = "#16a34a";
+                    btn.style.borderColor = "#16a34a";
+                    btn.style.color = "white";
+                    btn.onmouseover = () => {
+                        btn.style.backgroundColor = "#15803d";
+                        btn.style.borderColor = "#15803d";
+                    };
+                    btn.onmouseout = () => {
+                        btn.style.backgroundColor = "#16a34a";
+                        btn.style.borderColor = "#16a34a";
+                    };
+                }
+            });
+        }, 500);
+        </script>
         """,
         unsafe_allow_html=True,
     )
