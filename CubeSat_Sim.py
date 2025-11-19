@@ -12,7 +12,43 @@ import plotly.graph_objects as go
 import plotly.express as px
 import datetime as dt
 
-DEV_MODE = True  # set False in production
+# =========================
+# Environment / config
+# =========================
+ENV = os.getenv("CATSIM_ENV", "dev")  # "dev" or "prod"
+IS_DEV = ENV != "prod"
+
+CONFIG = {
+    "dev": {
+        # Dev Auth0 app
+        "AUTH0_DOMAIN": "dev-qwn3runpmc616as6.us.auth0.com",
+        "AUTH0_CLIENT_ID": "XvRZKwcHlcToRYGMMwnZiNjLnNzJmUmU",
+        # In practice, put this in an environment variable / Streamlit secret
+        "AUTH0_CLIENT_SECRET": os.getenv(
+            "AUTH0_CLIENT_SECRET_DEV",
+            "y7Sn91jH3sR1seU5uWPJAM89BSmS-pXfPQPcfDLzt_K3Cu2fk-D0vzYnA2sE2lah",
+        ),
+        "AUTH0_CALLBACK_URL": "https://cubesimprov2-lt6hcgkvpdvygnwbktyqdg.streamlit.app",
+        # Show dev-only controls like simulated plan selector
+        "SHOW_DEV_PLAN_SIM": True,
+    },
+    "prod": {
+        # TODO: replace these with your production Auth0 app settings
+        "AUTH0_DOMAIN": os.getenv("AUTH0_DOMAIN_PROD", "YOUR-PROD-AUTH0-DOMAIN"),
+        "AUTH0_CLIENT_ID": os.getenv("AUTH0_CLIENT_ID_PROD", "YOUR-PROD-CLIENT-ID"),
+        "AUTH0_CLIENT_SECRET": os.getenv("AUTH0_CLIENT_SECRET_PROD", "YOUR-PROD-CLIENT-SECRET"),
+        "AUTH0_CALLBACK_URL": os.getenv(
+            "AUTH0_CALLBACK_URL_PROD",
+            "https://your-prod-catsim-url.streamlit.app",
+        ),
+        "SHOW_DEV_PLAN_SIM": False,
+    },
+}[ENV]
+
+AUTH0_DOMAIN = CONFIG["AUTH0_DOMAIN"]
+AUTH0_CLIENT_ID = CONFIG["AUTH0_CLIENT_ID"]
+AUTH0_CLIENT_SECRET = CONFIG["AUTH0_CLIENT_SECRET"]
+AUTH0_CALLBACK_URL = CONFIG["AUTH0_CALLBACK_URL"]
 
 # =========================
 # Page setup
@@ -24,17 +60,8 @@ st.set_page_config(
 )
 
 # =========================
-# Auth0 config
-# =========================
-AUTH0_DOMAIN = "dev-qwn3runpmc616as6.us.auth0.com"
-AUTH0_CLIENT_ID = "XvRZKwcHlcToRYGMMwnZiNjLnNzJmUmU"
-AUTH0_CLIENT_SECRET = "y7Sn91jH3sR1seU5uWPJAM89BSmS-pXfPQPcfDLzt_K3Cu2fk-D0vzYnA2sE2lah"
-AUTH0_CALLBACK_URL = "https://cubesimprov2-lt6hcgkvpdvygnwbktyqdg.streamlit.app"
-
-
-# ---------------------------
 # Auth0 helpers (simple flow)
-# ---------------------------
+# =========================
 
 def auth0_login_url():
     """Build the Auth0 login URL."""
@@ -198,6 +225,7 @@ def show_header(user):
             st.markdown("🛰️")
     with col2:
         name = user.get("name") if user else "Guest"
+        env_label = "Development" if IS_DEV else "Production"
         st.markdown(
             f"""
             # **CATSIM — CubeSat Mission Simulator**
@@ -205,7 +233,7 @@ def show_header(user):
             *Davidsonville, Maryland, USA*  
 
             <span style="font-size:0.85rem;color:#6b7280;">
-            Signed in as: <strong>{name}</strong>
+            Signed in as: <strong>{name}</strong> • Environment: <strong>{env_label}</strong>
             </span>
             """,
             unsafe_allow_html=True,
@@ -865,7 +893,8 @@ with st.sidebar:
 
     st.header("Plan & Billing")
 
-    if DEV_MODE:
+    # Dev-only simulated plan controls
+    if CONFIG.get("SHOW_DEV_PLAN_SIM", False):
         st.markdown(
             "<div style='font-size:0.75rem; color:#888;'>Dev only: simulate subscription</div>",
             unsafe_allow_html=True,
