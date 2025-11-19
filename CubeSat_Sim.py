@@ -1015,7 +1015,7 @@ with st.sidebar:
                 """
             )
 
-                if st.session_state.plan_base != "pro":
+        if st.session_state.plan_base != "pro":
 
             st.markdown("### Upgrade")
 
