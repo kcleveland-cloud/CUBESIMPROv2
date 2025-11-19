@@ -1052,18 +1052,29 @@ with st.sidebar:
         col_c, col_d = st.columns(2)
 
         with col_c:
-            if st.button("Academic Pro $99/yr"):
-                # Feature-wise this is still "Pro"; license type handled in billing backend
-                st.session_state.plan_base = "pro"
-                # In production, route to Academic Pro Stripe flow / verification
-                st.rerun()
+    st.markdown(
+        "<style>div[data-testid='stButton'] button.academic-btn {width: 100%;}</style>",
+        unsafe_allow_html=True
+    )
+    if st.button("Academic Pro $99/yr", key="academic_btn", help="Academic license", 
+                 type="secondary"):
+        st.session_state.plan_base = "pro"
+        st.rerun()
+    st.markdown("<script>document.querySelector('#academic_btn button').classList.add('academic-btn');</script>",
+                unsafe_allow_html=True)
 
-        with col_d:
-            if st.button("Dept License $499/yr"):
-                # Department license unlocks Pro features for a group
-                st.session_state.plan_base = "pro"
-                # In production, route to Department license / invoice flow
-                st.rerun()
+
+with col_d:
+    st.markdown(
+        "<style>div[data-testid='stButton'] button.academic-btn {width: 100%;}</style>",
+        unsafe_allow_html=True
+    )
+    if st.button("Dept License $499/yr", key="dept_btn"):
+        st.session_state.plan_base = "pro"
+        st.rerun()
+    st.markdown("<script>document.querySelector('#dept_btn button').classList.add('academic-btn');</script>",
+                unsafe_allow_html=True)
+
 
         st.caption("In production, these buttons will redirect to the appropriate Stripe Checkout or invoice flow.")
     else:
