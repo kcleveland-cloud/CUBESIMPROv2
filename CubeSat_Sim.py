@@ -1013,7 +1013,7 @@ with st.sidebar:
 
         if st.session_state.plan_base != "pro":
 
-        st.markdown("### Upgrade")
+            st.markdown("### Upgrade")
 
         col_a, col_b = st.columns(2)
         with col_a:
@@ -1053,8 +1053,8 @@ with st.sidebar:
                 st.session_state.plan_base = "pro"
                 st.rerun()
 
-    else:
-        st.success("✅ You are on the Pro plan.")
+        else:
+            st.success("✅ You are on the Pro plan.")
 
 
 
