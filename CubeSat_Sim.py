@@ -932,14 +932,14 @@ with st.sidebar:
         label = st.session_state.plan_base.capitalize()
         st.markdown(f"**Current plan:** {label}")
 
-    # Replace old caption
-st.caption("Pricing (draft): Standard $9.99/mo • Pro $19.99/mo • Academic Pro $99/yr • Department $499/yr")
+    # Pricing caption (stays in sidebar)
+    st.caption("Pricing (draft): Standard $9.99/mo • Pro $19.99/mo • Academic Pro $99/yr • Department $499/yr")
 
-# ----- Dev-only pricing summary (for copy tuning) -----
-if DEV_MODE:
-    with st.expander("🧭 Final Pricing Structure (dev only)", expanded=False):
-        st.markdown(
-            """
+    # ----- Dev-only pricing summary (for copy tuning) -----
+    if DEV_MODE:
+        with st.expander("🧭 Final Pricing Structure (dev only)", expanded=False):
+            st.markdown(
+                """
 **Free Trial**
 - 30 days, no credit card  
 - Full Standard + optional 7-day Pro preview  
@@ -955,10 +955,10 @@ if DEV_MODE:
 
 **Department License — $499/year**
 - Unlimited seats for university programs and aerospace labs.
-            """
-        )
+                """
+            )
 
-
+    # Upgrade controls (always available, not dev-only)
     if st.session_state.plan_base != "pro":
         st.markdown("**Upgrade options (stubbed):**")
         col_a, col_b = st.columns(2)
@@ -977,6 +977,7 @@ if DEV_MODE:
     else:
         st.success("✅ You are on the Pro plan.")
 
+    # ---- Everything below here stays in the SIDEBAR ----
     st.header("Preset & Validation")
     use_genesat = st.checkbox("Load GeneSat-1 defaults", True)
     auto_cal = st.checkbox("Calibrate avg power to GeneSat target (~4.5 W)", True)
