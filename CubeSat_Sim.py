@@ -1036,17 +1036,26 @@ with st.sidebar:
     col_c, col_d = st.columns(2)
 
     with col_c:
-        if st.button("Academic Pro $99/yr", key="academic", help="Academic license"):
+        if st.button(
+            "Academic Pro $99/yr",
+            key="academic",
+            help="Academic license",
+        ):
             st.session_state.plan_base = "pro"
             st.rerun()
 
     with col_d:
-        if st.button("Dept License $499/yr", key="dept", help="Department license"):
+        if st.button(
+            "Dept License $499/yr",
+            key="dept",
+            help="Department license",
+        ):
             st.session_state.plan_base = "pro"
             st.rerun()
 
 else:
     st.success("✅ You are on the Pro plan.")
+
 
     # -------------------------
     # Simulation Setup
