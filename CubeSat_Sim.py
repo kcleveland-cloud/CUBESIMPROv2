@@ -71,6 +71,68 @@ AUTH0_CLIENT_SECRET = CONFIG["AUTH0_CLIENT_SECRET"]
 AUTH0_CALLBACK_URL = CONFIG["AUTH0_CALLBACK_URL"]
 
 # =========================
+# CATSIM Backend (Stripe + subscription API)
+# =========================
+
+BACKEND_BASE = os.getenv(
+    "CATSIM_BACKEND_URL",
+    "http://127.0.0.1:8000",  # change to your deployed backend URL in prod
+)
+
+
+def fetch_subscription_state(email: str) -> dict | None:
+    """Ask the backend what plan this email is on."""
+    if not BACKEND_BASE:
+        return None
+    try:
+        resp = requests.get(
+            f"{BACKEND_BASE}/subscription-state",
+            params={"email": email},
+            timeout=5,
+        )
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception:
+        return None
+    return None
+
+
+def create_checkout_session(plan_key: str, email: str) -> str | None:
+    """Create a Stripe Checkout Session for a given plan + email."""
+    if not BACKEND_BASE:
+        return None
+    try:
+        resp = requests.post(
+            f"{BACKEND_BASE}/create-checkout-session",
+            json={"plan_key": plan_key, "email": email},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("url")
+    except Exception as e:
+        st.error(f"Checkout error: {e}")
+        return None
+
+
+def create_billing_portal(customer_id: str) -> str | None:
+    """Create a Stripe Billing Portal Session for managing subscription."""
+    if not BACKEND_BASE:
+        return None
+    try:
+        resp = requests.post(
+            f"{BACKEND_BASE}/create-portal-session",
+            json={"customer_id": customer_id},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("url")
+    except Exception as e:
+        st.error(f"Billing portal error: {e}")
+        return None
+
+# =========================
 # Page setup
 # =========================
 st.set_page_config(
@@ -286,6 +348,15 @@ if not user:
 # Logged-in path from here down
 inject_brand_css()
 show_header(user)
+
+# If we just created a Stripe checkout or billing session, show the link
+if st.session_state.get("checkout_url"):
+    st.info(
+        "✅ Click below to open secure Stripe checkout / billing. "
+        "After completing payment, refresh CATSIM to update your plan."
+    )
+    st.markdown(f"[Open Stripe]({st.session_state.checkout_url})")
+    st.markdown("---")
 
 # =========================
 # Physical constants (SI)
@@ -871,28 +942,62 @@ def generate_odar_summary_text(
 
 
 # =========================
-# Pricing model & plan state
+# Pricing model & plan state (via backend)
 # =========================
-if "plan_base" not in st.session_state:
-    st.session_state.plan_base = "trial"
 
-if "trial_start" not in st.session_state:
-    st.session_state.trial_start = dt.date.today().isoformat()
+# Attach Auth0 identity early
+auth_email = (user or {}).get("email", "unknown")
+auth_name = (user or {}).get("name", "")
+auth_pic = (user or {}).get("picture")
 
 today = dt.date.today()
-trial_start = dt.date.fromisoformat(st.session_state.trial_start)
-trial_end = trial_start + dt.timedelta(days=30)
 
-in_trial = (st.session_state.plan_base == "trial") and (today <= trial_end)
+# One-time fetch of subscription state from backend
+if "subscription_state" not in st.session_state:
+    st.session_state.subscription_state = fetch_subscription_state(auth_email)
 
-if in_trial:
-    plan_effective = "standard"
+sub = st.session_state.subscription_state
+
+if sub:
+    plan_base = sub.get("plan_base", "trial")
+    trial_start_iso = sub.get("trial_start") or today.isoformat()
+    try:
+        trial_start = dt.date.fromisoformat(trial_start_iso)
+    except Exception:
+        trial_start = today
+    trial_end = trial_start + dt.timedelta(days=30)
+
+    in_trial = bool(sub.get("in_trial", False))
+    status = sub.get("status", "active")
+    customer_id = sub.get("customer_id")
+
+    # Effective plan: trial -> Standard features, Pro -> Pro features
+    if in_trial and plan_base != "pro":
+        plan_effective = "standard"
+    else:
+        plan_effective = plan_base
 else:
-    plan_effective = st.session_state.plan_base
+    # Fallback if backend unavailable: keep old local trial logic
+    if "plan_base" not in st.session_state:
+        st.session_state.plan_base = "trial"
+    if "trial_start" not in st.session_state:
+        st.session_state.trial_start = today.isoformat()
 
+    trial_start = dt.date.fromisoformat(st.session_state.trial_start)
+    trial_end = trial_start + dt.timedelta(days=30)
+    in_trial = (st.session_state.plan_base == "trial") and (today <= trial_end)
+    plan_effective = "standard" if in_trial else st.session_state.plan_base
+    plan_base = st.session_state.plan_base
+    status = "active"
+    customer_id = None
+
+# Persist into session_state for the rest of the app
+st.session_state.plan_base = plan_base
 st.session_state.effective_plan = plan_effective
 st.session_state.in_trial = in_trial
+st.session_state.trial_start = trial_start.isoformat()
 st.session_state.trial_end = trial_end.isoformat()
+st.session_state.stripe_customer_id = customer_id
 
 
 # =========================
@@ -926,7 +1031,7 @@ with st.sidebar:
     # -------------------------
     st.markdown("### Plan & Billing")
 
-    # Dev-only simulated plan controls (collapsed)
+    # Dev-only simulated plan controls (optional override)
     if CONFIG.get("SHOW_DEV_PLAN_SIM", False):
         with st.expander("Developer: simulate subscription", expanded=False):
             st.markdown(
@@ -947,11 +1052,17 @@ with st.sidebar:
                 if dev_choice == "Trial":
                     st.session_state.plan_base = "trial"
                     st.session_state.trial_start = dt.date.today().isoformat()
+                    st.session_state.in_trial = True
+                    st.session_state.effective_plan = "standard"
                 elif dev_choice == "Standard":
                     st.session_state.plan_base = "standard"
+                    st.session_state.in_trial = False
+                    st.session_state.effective_plan = "standard"
                 elif dev_choice == "Pro":
                     st.session_state.plan_base = "pro"
-                # "Use real plan" just leaves things as-is
+                    st.session_state.in_trial = False
+                    st.session_state.effective_plan = "pro"
+                # "Use real plan" -> do nothing special
                 st.rerun()
 
     # Current plan badge
@@ -992,7 +1103,7 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
 
-    # Dev-only long pricing copy (collapsed)
+    # Optional: dev-only detailed pricing copy
     if DEV_MODE:
         with st.expander("🧭 Full pricing structure (dev)", expanded=False):
             st.markdown(
@@ -1015,58 +1126,65 @@ with st.sidebar:
                 """
             )
 
-        if st.session_state.plan_base != "pro":
+    # Billing portal (if we know the Stripe customer)
+    if st.session_state.get("stripe_customer_id"):
+        if st.button("Manage billing & invoices"):
+            url = create_billing_portal(st.session_state.stripe_customer_id)
+            if url:
+                st.session_state.checkout_url = url
 
-            st.markdown("### Upgrade")
+    # Upgrade → Stripe Checkout (real flow)
+    if st.session_state.plan_base != "pro":
+        st.markdown("### Upgrade")
 
-            col_a, col_b = st.columns(2)
+        col_a, col_b = st.columns(2)
 
-            # Standard plans → Stripe Payment Links
-            with col_a:
-                st.link_button(
-                    "Standard $9.99/mo",
-                    STD_MONTHLY_LINK,
-                    help="Subscribe to CATSIM Standard Monthly",
-                )
-                st.link_button(
-                    "Standard $99/yr",
-                    STD_YEARLY_LINK,
-                    help="Subscribe to CATSIM Standard Yearly",
-                )
+        # Standard plans
+        with col_a:
+            if st.button("Standard $9.99/mo"):
+                url = create_checkout_session("standard_monthly", auth_email)
+                if url:
+                    st.session_state.checkout_url = url
+            if st.button("Standard $99/yr"):
+                url = create_checkout_session("standard_yearly", auth_email)
+                if url:
+                    st.session_state.checkout_url = url
 
-            # Pro plans → Stripe Payment Links (primary style via our CSS)
-            with col_b:
-                st.link_button(
-                    "🚀 Pro $19.99/mo",
-                    PRO_MONTHLY_LINK,
-                    help="Subscribe to CATSIM Pro Monthly",
-                )
-                st.link_button(
-                    "🚀 Pro $199/yr",
-                    PRO_YEARLY_LINK,
-                    help="Subscribe to CATSIM Pro Yearly",
-                )
+        # Pro plans
+        with col_b:
+            if st.button("🚀 Pro $19.99/mo", type="primary"):
+                url = create_checkout_session("pro_monthly", auth_email)
+                if url:
+                    st.session_state.checkout_url = url
+            if st.button("🚀 Pro $199/yr", type="primary"):
+                url = create_checkout_session("pro_yearly", auth_email)
+                if url:
+                    st.session_state.checkout_url = url
 
-            st.markdown("**Education & teams:**")
-            col_c, col_d = st.columns(2)
+        st.markdown("**Education & teams:**")
+        col_c, col_d = st.columns(2)
 
-            with col_c:
-                st.link_button(
-                    "Academic Pro $99/yr",
-                    ACADEMIC_LINK,
-                    help="Academic license (students & faculty)",
-                )
+        with col_c:
+            if st.button(
+                "Academic Pro $99/yr",
+                key="academic",
+                help="Academic license",
+            ):
+                url = create_checkout_session("academic_yearly", auth_email)
+                if url:
+                    st.session_state.checkout_url = url
 
-            with col_d:
-                st.link_button(
-                    "Dept License $499/yr",
-                    DEPT_LINK,
-                    help="Department / lab license",
-                )
-
-
-        else:
-            st.success("✅ You are on the Pro plan.")
+        with col_d:
+            if st.button(
+                "Dept License $499/yr",
+                key="dept",
+                help="Department license",
+            ):
+                url = create_checkout_session("dept_yearly", auth_email)
+                if url:
+                    st.session_state.checkout_url = url
+    else:
+        st.success("✅ You are on the Pro plan.")
 
 
 
