@@ -1051,34 +1051,59 @@ with st.sidebar:
         st.markdown("**Education & teams:**")
         col_c, col_d = st.columns(2)
 
+        # Academic & Department license buttons (green)
         with col_c:
-    st.markdown(
-        "<style>div[data-testid='stButton'] button.academic-btn {width: 100%;}</style>",
+            st.markdown(
+                """
+            <style>
+        /* Academic + Department buttons: green */
+        div[data-testid="stButton"] .academic-btn {
+            background-color: #16a34a !important;   /* green-600 */
+            border: 1px solid #16a34a !important;
+            color: white !important;
+        }
+        div[data-testid="stButton"] .academic-btn:hover {
+            background-color: #15803d !important;   /* green-700 */
+            border-color: #15803d !important;
+        }
+        </style>
+        """,
         unsafe_allow_html=True
     )
-    if st.button("Academic Pro $99/yr", key="academic_btn", help="Academic license", 
-                 type="secondary"):
+
+    # Academic Pro
+    if st.button("Academic Pro $99/yr", key="academic", help="Academic license"):
         st.session_state.plan_base = "pro"
         st.rerun()
-    st.markdown("<script>document.querySelector('#academic_btn button').classList.add('academic-btn');</script>",
-                unsafe_allow_html=True)
+
+    # Apply green class
+    st.markdown(
+        """
+        <script>
+        const btn = window.parent.document.querySelector('button[data-testid="baseButton- academic"]');
+        if(btn){ btn.classList.add("academic-btn"); }
+        </script>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 with col_d:
-    st.markdown(
-        "<style>div[data-testid='stButton'] button.academic-btn {width: 100%;}</style>",
-        unsafe_allow_html=True
-    )
-    if st.button("Dept License $499/yr", key="dept_btn"):
+    # Department License
+    if st.button("Dept License $499/yr", key="dept", help="Department license"):
         st.session_state.plan_base = "pro"
         st.rerun()
-    st.markdown("<script>document.querySelector('#dept_btn button').classList.add('academic-btn');</script>",
-                unsafe_allow_html=True)
 
+    st.markdown(
+        """
+        <script>
+        const btn2 = window.parent.document.querySelector('button[data-testid="baseButton- dept"]');
+        if(btn2){ btn2.classList.add("academic-btn"); }
+        </script>
+        """,
+        unsafe_allow_html=True
+    )
 
-        st.caption("In production, these buttons will redirect to the appropriate Stripe Checkout or invoice flow.")
-    else:
-        st.success("✅ You are on the Pro plan.")
 
     # -------------------------
     # Simulation Setup
