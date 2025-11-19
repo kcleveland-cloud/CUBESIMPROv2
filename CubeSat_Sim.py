@@ -150,9 +150,6 @@ def get_user():
     return None
 
 
-# =========================
-# Brand CSS
-# =========================
 def inject_brand_css():
     st.markdown(
         """
@@ -160,17 +157,6 @@ def inject_brand_css():
         :root {
             --primary-color: #1d4ed8 !important;
             --primaryColor: #1d4ed8 !important;
-        }
-
-        /* Academic / Department buttons — green, scoped to edu-buttons container */
-        #edu-buttons button {
-            background-color: #16a34a !important;   /* green-600 */
-            border: 1px solid #16a34a !important;
-            color: #ffffff !important;
-        }
-        #edu-buttons button:hover {
-            background-color: #15803d !important;   /* green-700 */
-            border-color: #15803d !important;
         }
 
         /* Top nav bar */
@@ -212,7 +198,7 @@ def inject_brand_css():
             color: #ffffff !important;
         }
 
-        /* SIDEBAR non-primary buttons — white with blue border */
+        /* SIDEBAR non-primary buttons — white with blue border by default */
         div[data-testid="stSidebar"] button:not([data-testid="baseButton-primary"]) {
             background-color: #ffffff !important;
             color: #1d4ed8 !important;
@@ -223,9 +209,23 @@ def inject_brand_css():
             color: #1d4ed8 !important;
             border-color: #1d4ed8 !important;
         }
+
+        /* Academic / Department buttons — override to green using tooltip title */
+        button[title="Academic license"],
+        button[title="Department license"] {
+            background-color: #16a34a !important;  /* green-600 */
+            border-color: #16a34a !important;
+            color: #ffffff !important;
+        }
+        button[title="Academic license"]:hover,
+        button[title="Department license"]:hover {
+            background-color: #15803d !important;  /* green-700 */
+            border-color: #15803d !important;
+            color: #ffffff !important;
+        }
         </style>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
 
@@ -1046,58 +1046,29 @@ with st.sidebar:
                 st.rerun()
 
                 st.markdown("**Education & teams:**")
-
-        # Academic & Department buttons
         col_c, col_d = st.columns(2)
 
+        # Academic Pro (green via CSS title selector)
         with col_c:
-            academic_clicked = st.button(
+            if st.button(
                 "Academic Pro $99/yr",
                 key="academic",
-                help="Academic license",
-            )
+                help="Academic license",   # <- this becomes title="Academic license"
+            ):
+                st.session_state.plan_base = "pro"
+                # In production, route to Academic Pro Stripe Checkout
+                st.rerun()
 
+        # Department License (green via CSS title selector)
         with col_d:
-            dept_clicked = st.button(
+            if st.button(
                 "Dept License $499/yr",
                 key="dept",
-                help="Department license",
-            )
-
-        # Plan changes (placeholder until Stripe is wired up)
-        if academic_clicked:
-            st.session_state.plan_base = "pro"
-            st.rerun()
-
-        if dept_clicked:
-            st.session_state.plan_base = "pro"
-            st.rerun()
-
-        # Make those two buttons green via a small JS hook
-        st.markdown(
-            """
-            <script>
-            (function() {
-              const doc = window.parent.document;
-              const labels = ["Academic Pro $99/yr", "Dept License $499/yr"];
-
-              const buttons = Array.from(
-                doc.querySelectorAll('button[kind], button[data-testid^="baseButton"]')
-              );
-
-              buttons.forEach(btn => {
-                const txt = (btn.innerText || "").trim();
-                if (labels.includes(txt)) {
-                  btn.style.backgroundColor = "#16a34a";
-                  btn.style.borderColor = "#16a34a";
-                  btn.style.color = "#ffffff";
-                }
-              });
-            })();
-            </script>
-            """,
-            unsafe_allow_html=True,
-        )
+                help="Department license",  # <- this becomes title="Department license"
+            ):
+                st.session_state.plan_base = "pro"
+                # In production, route to Dept License Stripe Checkout
+                st.rerun()
 
     else:
         st.success("You are on the Pro plan. Thank you for supporting CATSIM!")
