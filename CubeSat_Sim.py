@@ -928,7 +928,32 @@ with st.sidebar:
         label = st.session_state.plan_base.capitalize()
         st.markdown(f"**Current plan:** {label}")
 
-    st.caption("Pricing: Standard $4.99/mo • Pro $9.99/mo")
+    # Replace old caption
+st.caption("Pricing (draft): Standard $9.99/mo • Pro $19.99/mo • Academic Pro $99/yr • Department $499/yr")
+
+# ----- Dev-only pricing summary (for copy tuning) -----
+if DEV_MODE:
+    with st.expander("🧭 Final Pricing Structure (dev only)", expanded=False):
+        st.markdown(
+            """
+**Free Trial**
+- 30 days, no credit card  
+- Full Standard + optional 7-day Pro preview  
+
+**Standard — $9.99/mo or $99/yr**
+- Perfect for students and hobbyists.  
+
+**Pro — $19.99/mo or $199/yr**
+- For smallsat startups, SBIR teams, and professional engineers.  
+
+**Academic Pro — $99/year**
+- For verified students and faculty.  
+
+**Department License — $499/year**
+- Unlimited seats for university programs and aerospace labs.
+            """
+        )
+
 
     if st.session_state.plan_base != "pro":
         st.markdown("**Upgrade options (stubbed):**")
