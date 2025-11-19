@@ -15,7 +15,7 @@ import datetime as dt
 # =========================
 # Environment / config
 # =========================
-ENV = os.getenv("CATSIM_ENV", "dev")  # "dev" or "prod"
+ENV = os.getenv("CATSIM_ENV", "prod")  # "dev" or "prod"
 IS_DEV = ENV != "prod"
 
 CONFIG = {
