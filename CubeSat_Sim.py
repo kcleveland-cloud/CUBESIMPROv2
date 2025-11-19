@@ -977,10 +977,7 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
 
-    # Short pricing reminder
-    st.caption(
-        "Draft pricing: Standard $9.99/mo • Pro $19.99/mo • Academic Pro $99/yr • Department $499/yr"
-    )
+    # NOTE: removed the old "Draft pricing" caption here
 
     # Dev-only long pricing copy (collapsed)
     if DEV_MODE:
@@ -1014,17 +1011,49 @@ with st.sidebar:
     if st.session_state.plan_base != "pro":
         st.markdown("**Choose a plan:**")
 
+        # Standard / Pro buttons (monthly + annual)
         col_a, col_b = st.columns(2)
+
         with col_a:
             if st.button("Standard $9.99/mo"):
                 st.session_state.plan_base = "standard"
-                st.rerun()
-        with col_b:
-            if st.button("🚀 Go Pro $19.99/mo", type="primary"):
-                st.session_state.plan_base = "pro"
+                # In production, route to Standard monthly Stripe Checkout
                 st.rerun()
 
-        st.caption("In production, these buttons will redirect to Stripe Checkout.")
+            if st.button("Standard $99/yr"):
+                st.session_state.plan_base = "standard"
+                # In production, route to Standard annual Stripe Checkout
+                st.rerun()
+
+        with col_b:
+            if st.button("🚀 Pro $19.99/mo", type="primary"):
+                st.session_state.plan_base = "pro"
+                # In production, route to Pro monthly Stripe Checkout
+                st.rerun()
+
+            if st.button("🚀 Pro $199/yr", type="primary"):
+                st.session_state.plan_base = "pro"
+                # In production, route to Pro annual Stripe Checkout
+                st.rerun()
+
+        st.markdown("**Education & teams:**")
+        col_c, col_d = st.columns(2)
+
+        with col_c:
+            if st.button("Academic Pro $99/yr"):
+                # Feature-wise this is still "Pro"; license type handled in billing backend
+                st.session_state.plan_base = "pro"
+                # In production, route to Academic Pro Stripe flow / verification
+                st.rerun()
+
+        with col_d:
+            if st.button("Dept License $499/yr"):
+                # Department license unlocks Pro features for a group
+                st.session_state.plan_base = "pro"
+                # In production, route to Department license / invoice flow
+                st.rerun()
+
+        st.caption("In production, these buttons will redirect to the appropriate Stripe Checkout or invoice flow.")
     else:
         st.success("✅ You are on the Pro plan.")
 
