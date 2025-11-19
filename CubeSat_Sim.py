@@ -1045,27 +1045,60 @@ with st.sidebar:
                 # In production, route to Pro annual Stripe Checkout
                 st.rerun()
 
-        st.markdown("**Education & teams:**")
+                st.markdown("**Education & teams:**")
 
-        # Wrap academic buttons in a container so CSS can target them
-        st.markdown('<div id="edu-buttons">', unsafe_allow_html=True)
+        # Academic & Department buttons
         col_c, col_d = st.columns(2)
 
         with col_c:
-            # Academic Pro
-            if st.button("Academic Pro $99/yr", key="academic", help="Academic license"):
-                st.session_state.plan_base = "pro"
-                # In production, route to Academic Pro Stripe Checkout
-                st.rerun()
+            academic_clicked = st.button(
+                "Academic Pro $99/yr",
+                key="academic",
+                help="Academic license",
+            )
 
         with col_d:
-            # Department License
-            if st.button("Dept License $499/yr", key="dept", help="Department license"):
-                st.session_state.plan_base = "pro"
-                # In production, route to Dept License Stripe Checkout
-                st.rerun()
+            dept_clicked = st.button(
+                "Dept License $499/yr",
+                key="dept",
+                help="Department license",
+            )
 
-        st.markdown("</div>", unsafe_allow_html=True)
+        # Plan changes (placeholder until Stripe is wired up)
+        if academic_clicked:
+            st.session_state.plan_base = "pro"
+            st.rerun()
+
+        if dept_clicked:
+            st.session_state.plan_base = "pro"
+            st.rerun()
+
+        # Make those two buttons green via a small JS hook
+        st.markdown(
+            """
+            <script>
+            (function() {
+              const doc = window.parent.document;
+              const labels = ["Academic Pro $99/yr", "Dept License $499/yr"];
+
+              const buttons = Array.from(
+                doc.querySelectorAll('button[kind], button[data-testid^="baseButton"]')
+              );
+
+              buttons.forEach(btn => {
+                const txt = (btn.innerText || "").trim();
+                if (labels.includes(txt)) {
+                  btn.style.backgroundColor = "#16a34a";
+                  btn.style.borderColor = "#16a34a";
+                  btn.style.color = "#ffffff";
+                }
+              });
+            })();
+            </script>
+            """,
+            unsafe_allow_html=True,
+        )
+
     else:
         st.success("You are on the Pro plan. Thank you for supporting CATSIM!")
 
