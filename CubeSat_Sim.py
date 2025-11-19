@@ -958,20 +958,24 @@ with st.sidebar:
                 """
             )
 
-    # Upgrade controls (always available, not dev-only)
-    if st.session_state.plan_base != "pro":
+        if st.session_state.plan_base != "pro":
         st.markdown("**Upgrade options (stubbed):**")
         col_a, col_b = st.columns(2)
 
         with col_a:
-            if st.button("Standard $4.99/mo"):
+            if st.button("Standard $9.99/mo"):
                 st.session_state.plan_base = "standard"
                 st.rerun()
 
         with col_b:
-            if st.button("🚀 Go Pro $9.99/mo", type="primary"):
+            if st.button("🚀 Go Pro $19.99/mo", type="primary"):
                 st.session_state.plan_base = "pro"
                 st.rerun()
+
+        st.caption("In production, this would redirect to Stripe Checkout (monthly or annual).")
+    else:
+        st.success("✅ You are on the Pro plan.")
+
 
         st.caption("In production, this would redirect to Stripe Checkout.")
     else:
