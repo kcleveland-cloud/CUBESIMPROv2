@@ -210,15 +210,15 @@ def inject_brand_css():
             border-color: #1d4ed8 !important;
         }
 
-        /* Academic / Department buttons — FORCE to green via aria-label (button text) */
-        button[aria-label="Academic Pro $99/yr"],
-        button[aria-label="Dept License $499/yr"] {
+        /* Academic / Department buttons — FORCE to green via title (from help=) */
+        button[title="Academic license"],
+        button[title="Department license"] {
             background-color: #16a34a !important;   /* green-600 */
             border-color: #16a34a !important;
             color: #ffffff !important;
         }
-        button[aria-label="Academic Pro $99/yr"]:hover,
-        button[aria-label="Dept License $499/yr"]:hover {
+        button[title="Academic license"]:hover,
+        button[title="Department license"]:hover {
             background-color: #15803d !important;   /* green-700 */
             border-color: #15803d !important;
             color: #ffffff !important;
@@ -227,6 +227,7 @@ def inject_brand_css():
         """,
         unsafe_allow_html=True,
     )
+
 
 
 def show_header(user):
