@@ -74,20 +74,69 @@ AUTH0_CALLBACK_URL = CONFIG["AUTH0_CALLBACK_URL"]
 # CATSIM Backend (Stripe + subscription API)
 # =========================
 
+# =========================
+# CATSIM Backend (Stripe + subscription API)
+# =========================
+
 BACKEND_BASE = os.getenv(
     "CATSIM_BACKEND_URL",
     "http://127.0.0.1:8000",  # change to your deployed backend URL in prod
 )
 
 
-def fetch_subscription_state(email: str) -> dict | None:
-    """Ask the backend what plan this email is on."""
-    if not BACKEND_BASE:
+def sync_user_with_backend(user: dict) -> None:
+    """
+    Best-effort sync of Auth0 identity into the backend DB.
+
+    Backend endpoint: POST /sync-user
+      body:
+        {
+          "auth0_sub": "...",
+          "email": "...",
+          "stripe_customer_id": "cus_xxx" (optional)
+        }
+    """
+    if not BACKEND_BASE or not user:
+        return
+
+    try:
+        payload = {
+            "auth0_sub": user.get("sub"),
+            "email": user.get("email"),
+            "stripe_customer_id": st.session_state.get("stripe_customer_id"),
+        }
+        # Don't explode the app if backend is down
+        requests.post(
+            f"{BACKEND_BASE}/sync-user",
+            json=payload,
+            timeout=5,
+        )
+    except Exception:
+        # Silent fail; user can still run in local-trial mode
+        return
+
+
+def fetch_subscription_state(auth0_sub: str) -> dict | None:
+    """
+    Ask the backend what plan this Auth0 user is on.
+
+    Backend endpoint: GET /subscription-state?auth0_sub=...
+    Expected JSON (example):
+      {
+        "plan": "standard" | "pro" | "none",
+        "status": "active" | "trialing" | "canceled" | ...,
+        "price_id": "price_xxx" | null,
+        "current_period_end": "2025-01-01T00:00:00Z" | null,
+        "customer_id": "cus_xxx" | null
+      }
+    """
+    if not BACKEND_BASE or not auth0_sub:
         return None
+
     try:
         resp = requests.get(
             f"{BACKEND_BASE}/subscription-state",
-            params={"email": email},
+            params={"auth0_sub": auth0_sub},
             timeout=5,
         )
         if resp.status_code == 200:
@@ -335,9 +384,6 @@ def show_header(user):
     st.markdown("---")
 
 
-# =========================
-# Auth gate
-# =========================
 user = get_user()
 if not user:
     st.title("CATSIM — Sign in")
@@ -348,6 +394,10 @@ if not user:
 # Logged-in path from here down
 inject_brand_css()
 show_header(user)
+
+# Sync Auth0 identity into backend DB (best-effort; non-fatal if it fails)
+sync_user_with_backend(user)
+
 
 # If we just created a Stripe checkout or billing session, show the link
 if st.session_state.get("checkout_url"):
@@ -949,45 +999,39 @@ def generate_odar_summary_text(
 auth_email = (user or {}).get("email", "unknown")
 auth_name = (user or {}).get("name", "")
 auth_pic = (user or {}).get("picture")
+auth_sub = (user or {}).get("sub", "")
 
 today = dt.date.today()
 
-# One-time fetch of subscription state from backend
+# Ensure we have a trial_start baseline for local trial fallback
+if "trial_start" not in st.session_state:
+    st.session_state.trial_start = today.isoformat()
+
+# One-time fetch of subscription state from backend, keyed by Auth0 sub
 if "subscription_state" not in st.session_state:
-    st.session_state.subscription_state = fetch_subscription_state(auth_email)
+    st.session_state.subscription_state = fetch_subscription_state(auth_sub)
 
 sub = st.session_state.subscription_state
 
-if sub:
-    plan_base = sub.get("plan_base", "trial")
-    trial_start_iso = sub.get("trial_start") or today.isoformat()
-    try:
-        trial_start = dt.date.fromisoformat(trial_start_iso)
-    except Exception:
-        trial_start = today
-    trial_end = trial_start + dt.timedelta(days=30)
+trial_start = dt.date.fromisoformat(st.session_state.trial_start)
+trial_end = trial_start + dt.timedelta(days=30)
 
-    in_trial = bool(sub.get("in_trial", False))
+if sub and sub.get("plan") in ("standard", "pro"):
+    # Backend DB has a real subscription for this user
+    backend_plan = sub.get("plan")
+    plan_base = backend_plan
+    in_trial = False
     status = sub.get("status", "active")
     customer_id = sub.get("customer_id")
-
-    # Effective plan: trial -> Standard features, Pro -> Pro features
-    if in_trial and plan_base != "pro":
-        plan_effective = "standard"
-    else:
-        plan_effective = plan_base
+    plan_effective = plan_base
 else:
-    # Fallback if backend unavailable: keep old local trial logic
+    # No active subscription in DB (or backend unreachable) → use client-side 30-day trial
     if "plan_base" not in st.session_state:
         st.session_state.plan_base = "trial"
-    if "trial_start" not in st.session_state:
-        st.session_state.trial_start = today.isoformat()
 
-    trial_start = dt.date.fromisoformat(st.session_state.trial_start)
-    trial_end = trial_start + dt.timedelta(days=30)
-    in_trial = (st.session_state.plan_base == "trial") and (today <= trial_end)
-    plan_effective = "standard" if in_trial else st.session_state.plan_base
     plan_base = st.session_state.plan_base
+    in_trial = (plan_base == "trial") and (today <= trial_end)
+    plan_effective = "standard" if in_trial else plan_base
     status = "active"
     customer_id = None
 
@@ -998,6 +1042,7 @@ st.session_state.in_trial = in_trial
 st.session_state.trial_start = trial_start.isoformat()
 st.session_state.trial_end = trial_end.isoformat()
 st.session_state.stripe_customer_id = customer_id
+
 
 
 # =========================
