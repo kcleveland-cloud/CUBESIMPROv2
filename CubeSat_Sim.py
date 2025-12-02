@@ -265,7 +265,7 @@ def get_user():
             st.session_state["user"] = user
 
             # Clear query params so we don't keep reprocessing code
-            st.experimental_set_query_params()
+            st.query_params()
             return user
         except Exception as e:
             st.error(f"Auth error: {e}")
