@@ -247,7 +247,7 @@ def get_user():
     if "user" in st.session_state:
         return st.session_state["user"]
 
-    params = st.experimental_get_query_params()
+    params = st.query_params
     code_list = params.get("code")
     if code_list:
         code = code_list[0]
