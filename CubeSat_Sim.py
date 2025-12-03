@@ -224,7 +224,6 @@ def login_button():
 
 
 def _exchange_code_for_tokens(code: str):
-    """Talk to Auth0 /oauth/token to trade code for tokens."""
     token_url = f"https://{AUTH0_DOMAIN}/oauth/token"
     data = {
         "grant_type": "authorization_code",
@@ -232,16 +231,16 @@ def _exchange_code_for_tokens(code: str):
         "client_secret": AUTH0_CLIENT_SECRET,
         "code": code,
         "redirect_uri": AUTH0_CALLBACK_URL,
-        "audience": AUTH0_AUDIENCE,  # keep this
+        "audience": AUTH0_AUDIENCE,
     }
 
     resp = requests.post(token_url, data=data)
 
     if resp.status_code != 200:
-        # Show the full error from Auth0 so we can diagnose it
         raise RuntimeError(f"{resp.status_code} {resp.text}")
 
     return resp.json()
+
 
 
 
