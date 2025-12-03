@@ -1106,9 +1106,6 @@ st.session_state.stripe_customer_id = customer_id
 
 
 
-# =========================
-# Sidebar controls (including plan UI)
-# =========================
 with st.sidebar:
     # -------------------------
     # Account
@@ -1168,7 +1165,6 @@ with st.sidebar:
                     st.session_state.plan_base = "pro"
                     st.session_state.in_trial = False
                     st.session_state.effective_plan = "pro"
-                # "Use real plan" -> do nothing special
                 st.rerun()
 
     # Current plan badge
@@ -1235,11 +1231,15 @@ with st.sidebar:
     # Billing portal (if we know the Stripe customer)
     if st.session_state.get("stripe_customer_id"):
         if st.button("Manage billing & invoices"):
-            url = create_billing_portal(st.session_state.stripe_customer_id)
+            # 🔄 spinner while we create portal session
+            with st.spinner("Opening secure Stripe billing portal..."):
+                url = create_billing_portal(st.session_state.stripe_customer_id)
             if url:
                 st.session_state.checkout_url = url
 
-    # Upgrade → Stripe Checkout (real flow)
+    # -------------------------
+    # Upgrade buttons + spinner
+    # -------------------------
     if st.session_state.plan_base != "pro":
         st.markdown("### Upgrade")
 
@@ -1248,22 +1248,28 @@ with st.sidebar:
         # Standard plans
         with col_a:
             if st.button("Standard $9.99/mo"):
-                url = create_checkout_session("standard_monthly", auth_email)
+                with st.spinner("Contacting secure Stripe checkout..."):
+                    url = create_checkout_session("standard_monthly", auth_email)
                 if url:
                     st.session_state.checkout_url = url
+
             if st.button("Standard $99/yr"):
-                url = create_checkout_session("standard_yearly", auth_email)
+                with st.spinner("Contacting secure Stripe checkout..."):
+                    url = create_checkout_session("standard_yearly", auth_email)
                 if url:
                     st.session_state.checkout_url = url
 
         # Pro plans
         with col_b:
             if st.button("🚀 Pro $19.99/mo", type="primary"):
-                url = create_checkout_session("pro_monthly", auth_email)
+                with st.spinner("Contacting secure Stripe checkout..."):
+                    url = create_checkout_session("pro_monthly", auth_email)
                 if url:
                     st.session_state.checkout_url = url
+
             if st.button("🚀 Pro $199/yr", type="primary"):
-                url = create_checkout_session("pro_yearly", auth_email)
+                with st.spinner("Contacting secure Stripe checkout..."):
+                    url = create_checkout_session("pro_yearly", auth_email)
                 if url:
                     st.session_state.checkout_url = url
 
@@ -1276,7 +1282,8 @@ with st.sidebar:
                 key="academic",
                 help="Academic license",
             ):
-                url = create_checkout_session("academic_yearly", auth_email)
+                with st.spinner("Contacting secure Stripe checkout..."):
+                    url = create_checkout_session("academic_yearly", auth_email)
                 if url:
                     st.session_state.checkout_url = url
 
@@ -1286,11 +1293,30 @@ with st.sidebar:
                 key="dept",
                 help="Department license",
             ):
-                url = create_checkout_session("dept_yearly", auth_email)
+                with st.spinner("Contacting secure Stripe checkout..."):
+                    url = create_checkout_session("dept_yearly", auth_email)
                 if url:
                     st.session_state.checkout_url = url
     else:
         st.success("✅ You are on the Pro plan.")
+
+    # -------------------------
+    # Checkout link (now in sidebar)
+    # -------------------------
+    if st.session_state.get("checkout_url"):
+        st.markdown("### Checkout / Billing")
+        st.info(
+            "✅ Click below to open secure Stripe checkout / billing.  "
+            "After completing payment, refresh CATSIM to update your plan."
+        )
+        st.markdown(f"[Open Stripe]({st.session_state.checkout_url})")
+
+    # -------------------------
+    # Simulation setup (unchanged)
+    # -------------------------
+    st.divider()
+    st.markdown("### Simulation setup")
+    # ... (rest of your sidebar controls)
 
 
 
