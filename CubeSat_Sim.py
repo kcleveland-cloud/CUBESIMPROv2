@@ -31,9 +31,10 @@ DEPT_LINK        = os.getenv("CATSIM_DEPT_LINK", "https://buy.stripe.com/4gM5kD5
 # Streamlit Cloud:
 #   - Dev app:  CATSIM_ENV=dev
 #   - Prod app: CATSIM_ENV=prod
-ENV = os.getenv("CATSIM_ENV", "dev")  # default to 'dev' if not set
-DEV_MODE = (ENV == "dev")
-IS_DEV = DEV_MODE
+ENV = "dev"
+DEV_MODE = True
+IS_DEV = True
+
 
 CONFIG = {
     "dev": {
