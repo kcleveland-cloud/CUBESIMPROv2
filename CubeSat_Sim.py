@@ -24,11 +24,7 @@ PRO_YEARLY_LINK  = os.getenv("CATSIM_PRO_YEARLY_LINK", "https://buy.stripe.com/d
 ACADEMIC_LINK    = os.getenv("CATSIM_ACAD_LINK", "https://buy.stripe.com/dRm9AT7StarS56E7up1RC04")   # optional
 DEPT_LINK        = os.getenv("CATSIM_DEPT_LINK", "https://buy.stripe.com/4gM5kD5Kl9nO7eMaGB1RC05")   # optional
 
-AUTH0_DOMAIN = CONFIG["AUTH0_DOMAIN"]
-AUTH0_CLIENT_ID = CONFIG["AUTH0_CLIENT_ID"]
-AUTH0_CLIENT_SECRET = CONFIG["AUTH0_CLIENT_SECRET"]
-AUTH0_CALLBACK_URL = CONFIG["AUTH0_CALLBACK_URL"]
-AUTH0_AUDIENCE = "https://catsim-backend-api"
+
 
 # =========================
 # Environment: dev vs prod
@@ -71,7 +67,11 @@ CONFIG = {
     },
 }[ENV]
 
-
+AUTH0_DOMAIN = CONFIG["AUTH0_DOMAIN"]
+AUTH0_CLIENT_ID = CONFIG["AUTH0_CLIENT_ID"]
+AUTH0_CLIENT_SECRET = CONFIG["AUTH0_CLIENT_SECRET"]
+AUTH0_CALLBACK_URL = CONFIG["AUTH0_CALLBACK_URL"]
+AUTH0_AUDIENCE = "https://catsim-backend-api"
 
 # =========================
 # CATSIM Backend (Stripe + subscription API)
