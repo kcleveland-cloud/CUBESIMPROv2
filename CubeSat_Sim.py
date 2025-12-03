@@ -55,7 +55,7 @@ CONFIG = {
         "AUTH0_CLIENT_ID": os.getenv("XvRZKwcHlcToRYGMMwnZiNjLnNzJmUmU"),
         "AUTH0_CLIENT_SECRET": os.getenv(
             "AUTH0_CLIENT_SECRET_PROD",
-            "y7Sn91jH3sR1seU5uWPJAM89BSmS-pXfPQPcfDLzt_K3Cu2fk-D0vzYnA2sE2lah",
+            "E9BAjy7QLsJ0GSAYPMoBvb-vg7lMeLObKBqdsBupoQoVcVUHM75hmXOSDm2jzuw7",
         ),
         "AUTH0_CALLBACK_URL": os.getenv(
             "AUTH0_CALLBACK_URL_PROD",
