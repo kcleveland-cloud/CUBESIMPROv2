@@ -73,6 +73,7 @@ def auth0_login_url():
         "client_id": AUTH0_CLIENT_ID,
         "redirect_uri": AUTH0_CALLBACK_URL,
         "scope": "openid profile email",
+        "audience": AUTH0_AUDIENCE,  # 🔑 ask Auth0 for a token for your API
     }
     return f"https://{AUTH0_DOMAIN}/authorize?" + urllib.parse.urlencode(params)
 
