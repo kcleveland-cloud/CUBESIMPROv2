@@ -102,11 +102,17 @@ def _exchange_code_for_tokens(code: str):
         "client_secret": AUTH0_CLIENT_SECRET,
         "code": code,
         "redirect_uri": AUTH0_CALLBACK_URL,
+        "audience": AUTH0_AUDIENCE,  # keep this
     }
 
     resp = requests.post(token_url, data=data)
-    resp.raise_for_status()
+
+    if resp.status_code != 200:
+        # Show the full error from Auth0 so we can diagnose it
+        raise RuntimeError(f"{resp.status_code} {resp.text}")
+
     return resp.json()
+
 
 
 def get_user():
