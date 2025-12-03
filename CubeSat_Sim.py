@@ -460,14 +460,7 @@ show_header(user)
 sync_user_with_backend(user)
 
 
-# If we just created a Stripe checkout or billing session, show the link
-if st.session_state.get("checkout_url"):
-    st.info(
-        "✅ Click below to open secure Stripe checkout / billing. "
-        "After completing payment, refresh CATSIM to update your plan."
-    )
-    st.markdown(f"[Open Stripe]({st.session_state.checkout_url})")
-    st.markdown("---")
+
 
 # =========================
 # Physical constants (SI)
