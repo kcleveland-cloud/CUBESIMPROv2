@@ -237,10 +237,8 @@ def _exchange_code_for_tokens(code: str):
     }
 
     resp = requests.post(token_url, data=data)
-
     if resp.status_code != 200:
         raise RuntimeError(f"{resp.status_code} {resp.text}")
-
     return resp.json()
 
 
