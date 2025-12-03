@@ -204,10 +204,10 @@ def auth0_login_url():
         "client_id": AUTH0_CLIENT_ID,
         "redirect_uri": AUTH0_CALLBACK_URL,
         "scope": "openid profile email",
-        "audience": AUTH0_AUDIENCE,   # REQUIRED for API access
+        # Audience ONLY on /authorize, not on /oauth/token
+        "audience": AUTH0_AUDIENCE,
     }
     return f"https://{AUTH0_DOMAIN}/authorize?" + urllib.parse.urlencode(params)
-
 
 
 def auth0_logout_url():
@@ -226,6 +226,7 @@ def login_button():
 
 
 def _exchange_code_for_tokens(code: str):
+    """Exchange authorization code for tokens via Auth0 /oauth/token."""
     token_url = f"https://{AUTH0_DOMAIN}/oauth/token"
     data = {
         "grant_type": "authorization_code",
@@ -233,15 +234,13 @@ def _exchange_code_for_tokens(code: str):
         "client_secret": AUTH0_CLIENT_SECRET,
         "code": code,
         "redirect_uri": AUTH0_CALLBACK_URL,
-        "audience": AUTH0_AUDIENCE,
+        # NOTE: no 'audience' here
     }
 
     resp = requests.post(token_url, data=data)
     if resp.status_code != 200:
         raise RuntimeError(f"{resp.status_code} {resp.text}")
     return resp.json()
-
-
 
 
 def get_user():
@@ -252,13 +251,19 @@ def get_user():
     2) Else, if we have ?code=... in URL -> exchange it, store user, clear params.
     3) Else return None.
     """
+    # Already logged in this session
     if "user" in st.session_state:
         return st.session_state["user"]
 
+    # Get ?code=... from query params (string in modern Streamlit)
     params = st.query_params
-    code_list = params.get("code")
-    if code_list:
-        code = code_list[0]
+    code = params.get("code")
+
+    # st.query_params used to return lists; be robust to both
+    if isinstance(code, list):
+        code = code[0]
+
+    if code:
         try:
             tokens = _exchange_code_for_tokens(code)
             id_token = tokens["id_token"]
@@ -272,8 +277,56 @@ def get_user():
             }
             st.session_state["user"] = user
 
-            # Clear query params so we don't keep reprocessing code
-            st.query_params()
+            # Clear query params so the code is not reused on rerun
+            st.query_params.clear()
+
+            return user
+        except Exception as e:
+            st.error(f"Auth error: {e}")
+            return None
+
+    return None
+
+
+
+
+def get_user():
+    """
+    Returns the current user dict, or None.
+
+    1) If user already in session_state -> return it.
+    2) Else, if we have ?code=... in URL -> exchange it, store user, clear params.
+    3) Else return None.
+    """
+    # Already logged in this session
+    if "user" in st.session_state:
+        return st.session_state["user"]
+
+    # Get ?code=... from query params (string in modern Streamlit)
+    params = st.query_params
+    code = params.get("code")
+
+    # st.query_params used to return lists; be robust to both
+    if isinstance(code, list):
+        code = code[0]
+
+    if code:
+        try:
+            tokens = _exchange_code_for_tokens(code)
+            id_token = tokens["id_token"]
+            claims = jwt.get_unverified_claims(id_token)
+
+            user = {
+                "sub": claims.get("sub"),
+                "email": claims.get("email"),
+                "name": claims.get("name"),
+                "picture": claims.get("picture"),
+            }
+            st.session_state["user"] = user
+
+            # Clear query params so the code is not reused on rerun
+            st.query_params.clear()
+
             return user
         except Exception as e:
             st.error(f"Auth error: {e}")
