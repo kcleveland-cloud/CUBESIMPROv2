@@ -1200,16 +1200,39 @@ sub = st.session_state.subscription_state
 trial_start = dt.date.fromisoformat(st.session_state.trial_start)
 trial_end = trial_start + dt.timedelta(days=30)
 
-if sub and sub.get("plan") in ("standard", "pro"):
-    # Backend DB has a real subscription for this user
-    backend_plan = sub.get("plan")
-    plan_base = backend_plan
-    in_trial = False
-    status = sub.get("status", "active")
-    customer_id = sub.get("customer_id")
-    plan_effective = plan_base
+backend_plan = None
+status = "active"
+customer_id = None
+
+if sub:
+    # New backend schema: use plan_key to infer base plan
+    # Expected shape:
+    #   {
+    #     "plan_key": "pro_monthly" | "standard_yearly" | "academic_yearly" | ...,
+    #     "status": "active" | "trialing" | ...,
+    #     "current_period_end": "...",
+    #     "customer_id": "cus_xxx"
+    #   }
+    plan_key = (sub.get("plan_key") or "").lower()
+
+    if sub.get("plan") in ("standard", "pro"):
+        # Backward-compat if backend still sends 'plan'
+        backend_plan = sub.get("plan")
+    elif plan_key.startswith("pro_"):
+        backend_plan = "pro"
+    elif plan_key.startswith("standard_"):
+        backend_plan = "standard"
+
+    if backend_plan:
+        status = sub.get("status", "active")
+        customer_id = sub.get("customer_id")
+
+# If backend has a real subscription → use it; else fall back to local 30-day trial
+if backend_plan:
+    plan_base = backend_plan          # "standard" or "pro"
+    in_trial = (status.lower() == "trialing")
+    plan_effective = plan_base        # you can keep this as-is; Pro tabs check against this
 else:
-    # No active subscription in DB (or backend unreachable) → use client-side 30-day trial
     if "plan_base" not in st.session_state:
         st.session_state.plan_base = "trial"
 
@@ -1226,6 +1249,7 @@ st.session_state.in_trial = in_trial
 st.session_state.trial_start = trial_start.isoformat()
 st.session_state.trial_end = trial_end.isoformat()
 st.session_state.stripe_customer_id = customer_id
+
 
 
 
