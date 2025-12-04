@@ -191,6 +191,40 @@ def get_user():
 
     return None
 
+def start_checkout(tier: str):
+    user = st.session_state.get("user")
+    if not user:
+        st.error("You must be signed in to upgrade.")
+        return
+
+    payload = {
+        "user_id": user.get("sub"),
+        "email": user.get("email"),
+        "name": user.get("name"),
+        "tier": tier,  # "pro" or "standard"
+    }
+
+    try:
+        resp = requests.post(
+            api_url("/create-checkout-session"),
+            json=payload,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        st.write("Redirecting to Stripe Checkout...")
+        st.markdown(
+            f"<meta http-equiv='refresh' content='0; url={data['url']}'>",
+            unsafe_allow_html=True,
+        )
+    except Exception as e:
+        st.error("Checkout error: Could not start Stripe checkout.")
+        if os.getenv("CATSIM_ENV", "dev") == "dev":
+            try:
+                st.write("Debug checkout:", resp.status_code, resp.text)
+            except Exception:
+                st.write("Debug checkout exception:", str(e))
+
 
 # =========================
 # Brand CSS
