@@ -1373,15 +1373,7 @@ with st.sidebar:
         # Local 30-day trial fallback
         end_text = f"Trial ends: {trial_end.isoformat()}"
 
-    st.markdown(
-        f"""
-        <div style="padding: 12px; background: #f5f9ff; border: 1px solid #c3d5ff;">
-            <b>Current plan:</b> 🚀 {label}<br>
-            {end_text}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    
 
     st.markdown(
         f"""
