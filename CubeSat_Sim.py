@@ -28,11 +28,7 @@ BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "https://catsim-backend.onrende
 def api_url(path: str) -> str:
     return f"{BACKEND_BASE_URL.rstrip('/')}{path}"
 
-resp = requests.post(
-    api_url("/create-portal-session"),
-    json=payload,
-    timeout=10,
-)
+
 
 # =========================
 # Environment: dev vs prod
