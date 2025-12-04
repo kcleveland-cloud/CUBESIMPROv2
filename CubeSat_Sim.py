@@ -1332,36 +1332,56 @@ with st.sidebar:
 
     st.divider()
 
-    # -------------------------
+ # -------------------------
     # Plan & Billing
     # -------------------------
     st.markdown("### Plan & Billing")
 
-    # Work out a simple label/end text using backend state + local trial
-    if sub and sub.get("plan") in ("standard", "pro"):
-        plan_name = sub.get("plan", "standard").title()
-        status = (sub.get("status") or "active").title()
-        end_dt_str = sub.get("current_period_end")
-        if end_dt_str:
-            try:
-                end_date = dt.date.fromisoformat(end_dt_str[:10])
-                end_text = (
-                    f"Renews: {end_date.isoformat()}"
-                    if status.lower() == "active"
-                    else f"Ends: {end_date.isoformat()}"
-                )
-            except Exception:
-                end_text = ""
-        else:
-            end_text = ""
-        label = f"{plan_name} ({status})"
-    else:
+    # Use effective plan + normalized subscription to drive the label
+    sub_norm = sub  # already normalized by normalize_subscription_state
+    status = (sub_norm.get("status") or "").lower() if sub_norm else ""
+    human = (sub_norm.get("human_readable") or "").strip() if sub_norm else ""
+    end_dt_str = sub_norm.get("current_period_end") if sub_norm else None
+
+    # Decide label based on effective plan + trial state
+    if plan_effective == "pro":
+        label = human or "Pro"
+    elif plan_effective == "standard":
         if in_trial:
             label = "Trial (Standard)"
-            end_text = f"Trial ends: {trial_end.isoformat()}"
+        else:
+            label = human or "Standard"
+    else:
+        # No backend sub; local trial or fully free
+        if in_trial:
+            label = "Trial (Standard)"
         else:
             label = "Free (Standard features only)"
+
+    # Decide end / renew text
+    end_text = ""
+    if end_dt_str:
+        try:
+            end_date = dt.date.fromisoformat(end_dt_str[:10])
+            if status == "trialing" or (in_trial and plan_effective != "pro"):
+                end_text = f"Trial ends: {end_date.isoformat()}"
+            else:
+                end_text = f"Renews: {end_date.isoformat()}"
+        except Exception:
             end_text = ""
+    elif in_trial and plan_effective != "pro":
+        # Local 30-day trial fallback
+        end_text = f"Trial ends: {trial_end.isoformat()}"
+
+    st.markdown(
+        f"""
+        <div style="padding: 12px; background: #f5f9ff; border: 1px solid #c3d5ff;">
+            <b>Current plan:</b> 🚀 {label}<br>
+            {end_text}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     st.markdown(
         f"""
