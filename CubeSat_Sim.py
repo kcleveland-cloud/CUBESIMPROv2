@@ -1299,12 +1299,11 @@ with st.sidebar:
 
 st.markdown("### Plan & Billing")
 
-# 1) Fetch REAL subscription state from backend
-sub_state: dict = {}
+# ------------------------
+# 1. Fetch subscription state
+# ------------------------
 try:
-    # assume you already have the logged-in Auth0 sub in user_info["sub"]
     auth0_sub = st.session_state.get("auth0_sub") or user_info["sub"]
-
     resp = requests.get(
         f"{BACKEND_URL}/subscription-state",
         params={"auth0_sub": auth0_sub},
@@ -1317,70 +1316,55 @@ except Exception as e:
     print("subscription_state error:", repr(e))
     sub_state = {}
 
-effective_state = dict(sub_state)  # we may override this in dev
+effective_state = dict(sub_state)
 
-# 2) Developer override (what you already have in the UI)
-DEV_SIM_KEY = "dev_simulated_plan"
-
+# ------------------------
+# 2. Developer override
+# ------------------------
 with st.expander("Developer: simulate subscription"):
-    st.caption("Overrides the real subscription in dev only.")
     sim_choice = st.radio(
         "Simulated plan",
         ["Use real plan", "Trial", "Standard", "Pro"],
         index=0,
-        key="dev_sim_choice_radio",
     )
 
     if st.button("Apply dev plan"):
-        st.session_state[DEV_SIM_KEY] = sim_choice
+        st.session_state["dev_sim_plan"] = sim_choice
 
-# Apply override ONLY in dev and ONLY if not "Use real plan"
-sim_choice_effective = st.session_state.get(DEV_SIM_KEY, "Use real plan")
+sim_choice_effective = st.session_state.get("dev_sim_plan", "Use real plan")
 
 if DEV_MODE and sim_choice_effective != "Use real plan":
-    # Build a fake sub_state for display purposes
-    today = dt.date.today()
-    fake_end = today + dt.timedelta(days=30)
+    # build fake plan here...
+    effective_state = {
+        "plan_key": "pro_monthly",
+        "status": "active",
+        "current_period_end": "2025-01-03",
+    }
 
-    if sim_choice_effective == "Trial":
-        effective_state = {
-            "plan_key": "standard_monthly",
-            "human_readable": "Standard Monthly",
-            "status": "trialing",
-            "current_period_end": fake_end.isoformat(),
-        }
-    elif sim_choice_effective == "Standard":
-        effective_state = {
-            "plan_key": "standard_monthly",
-            "human_readable": "Standard Monthly",
-            "status": "active",
-            "current_period_end": fake_end.isoformat(),
-        }
-    elif sim_choice_effective == "Pro":
-        effective_state = {
-            "plan_key": "pro_monthly",
-            "human_readable": "Pro Monthly",
-            "status": "active",
-            "current_period_end": fake_end.isoformat(),
-        }
-# else: effective_state stays as the real Stripe-driven sub_state
-
-# 3) Render the blue "Current plan" card using describe_subscription()
+# ------------------------
+# 3. Current plan card
+# ------------------------
 plan_label, end_text = describe_subscription(effective_state)
 
 st.markdown(
     f"""
-    <div style="border-radius: 8px; padding: 12px 16px; background-color: #f5f9ff; border: 1px solid #c3d5ff; margin-bottom: 8px;">
-        <div style="font-weight: 600; margin-bottom: 4px;">
-            Current plan: 🚀 {plan_label}
-        </div>
-        <div style="font-size: 0.9rem; color: #444;">
-            {end_text}
-        </div>
+    <div style="padding: 12px; background: #f5f9ff; border: 1px solid #c3d5ff;">
+        <b>Current plan:</b> 🚀 {plan_label}<br>
+        {end_text}
     </div>
     """,
     unsafe_allow_html=True,
 )
+
+# ------------------------
+# 4. Your plan_base logic (this is where it belongs)
+# ------------------------
+if "plan_base" not in st.session_state:
+    st.session_state.plan_base = None
+
+if st.session_state.plan_base != "pro":
+    st.warning("Pro features are locked. Upgrade to Pro to enable.")
+
 
     # -------------------------
     # Upgrade buttons + spinner
