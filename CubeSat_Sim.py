@@ -1267,10 +1267,7 @@ st.session_state.trial_start = trial_start.isoformat()
 st.session_state.trial_end = trial_end.isoformat()
 st.session_state.stripe_customer_id = customer_id
 
-if os.getenv("CATSIM_ENV", "dev") == "dev":
-    st.sidebar.caption(f"DEBUG sub_raw: {sub_raw}")
-    st.sidebar.caption(f"DEBUG normalized: {sub}")
-    st.sidebar.caption(f"DEBUG plan_effective: {plan_effective}")
+
 
 
 # ----- SIDEBAR: account + plan + sim setup -----
