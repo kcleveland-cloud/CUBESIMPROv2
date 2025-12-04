@@ -125,7 +125,28 @@ def get_billing_portal_url(user: dict | None) -> str | None:
                 st.sidebar.write(str(e))
         return None
 
-        
+def normalize_subscription_state(raw: dict | None) -> dict:
+    """
+    Accepts whatever the backend /subscription-state returns and
+    pulls out the actual subscription dict.
+
+    Handles both:
+      { "plan_key": "...", "status": "...", ... }
+    and
+      { "subscription": { "plan_key": "...", ... } }
+    """
+    if not isinstance(raw, dict):
+        return {}
+
+    # If wrapped in {"subscription": {...}}
+    inner = raw.get("subscription")
+    if isinstance(inner, dict):
+        return inner
+
+    return raw
+
+
+
 def sync_user_with_backend(user: dict) -> None:
     """
     Best-effort sync of Auth0 identity into the backend DB.
@@ -1191,11 +1212,12 @@ today = dt.date.today()
 if "trial_start" not in st.session_state:
     st.session_state.trial_start = today.isoformat()
 
-# One-time fetch of subscription state from backend, keyed by Auth0 sub
+# One-time fetch of raw subscription state from backend, keyed by Auth0 sub
 if "subscription_state" not in st.session_state:
     st.session_state.subscription_state = fetch_subscription_state(auth_sub)
 
-sub = st.session_state.subscription_state
+sub_raw = st.session_state.subscription_state
+sub = normalize_subscription_state(sub_raw)  # <-- unwrap + normalize
 
 trial_start = dt.date.fromisoformat(st.session_state.trial_start)
 trial_end = trial_start + dt.timedelta(days=30)
@@ -1205,34 +1227,29 @@ status = "active"
 customer_id = None
 
 if sub:
-    # New backend schema: use plan_key to infer base plan
-    # Expected shape:
-    #   {
-    #     "plan_key": "pro_monthly" | "standard_yearly" | "academic_yearly" | ...,
-    #     "status": "active" | "trialing" | ...,
-    #     "current_period_end": "...",
-    #     "customer_id": "cus_xxx"
-    #   }
+    # Handle either 'plan' or 'plan_key'
     plan_key = (sub.get("plan_key") or "").lower()
+    plan_field = (sub.get("plan") or "").lower()
 
-    if sub.get("plan") in ("standard", "pro"):
-        # Backward-compat if backend still sends 'plan'
-        backend_plan = sub.get("plan")
+    if plan_field in ("standard", "pro"):
+        backend_plan = plan_field
     elif plan_key.startswith("pro_"):
         backend_plan = "pro"
     elif plan_key.startswith("standard_"):
         backend_plan = "standard"
+    elif plan_key in ("pro", "standard"):
+        backend_plan = plan_key
 
-    if backend_plan:
-        status = sub.get("status", "active")
-        customer_id = sub.get("customer_id")
+    status = (sub.get("status") or "active")
+    customer_id = sub.get("customer_id")
 
-# If backend has a real subscription → use it; else fall back to local 30-day trial
+# If backend has a real subscription → trust it
 if backend_plan:
     plan_base = backend_plan          # "standard" or "pro"
     in_trial = (status.lower() == "trialing")
-    plan_effective = plan_base        # you can keep this as-is; Pro tabs check against this
+    plan_effective = plan_base        # Pro tabs & export check this
 else:
+    # No Stripe subscription in DB (or backend unreachable) → local 30-day trial
     if "plan_base" not in st.session_state:
         st.session_state.plan_base = "trial"
 
@@ -1250,7 +1267,10 @@ st.session_state.trial_start = trial_start.isoformat()
 st.session_state.trial_end = trial_end.isoformat()
 st.session_state.stripe_customer_id = customer_id
 
-
+if os.getenv("CATSIM_ENV", "dev") == "dev":
+    st.sidebar.caption(f"DEBUG sub_raw: {sub_raw}")
+    st.sidebar.caption(f"DEBUG normalized: {sub}")
+    st.sidebar.caption(f"DEBUG plan_effective: {plan_effective}")
 
 
 # ----- SIDEBAR: account + plan + sim setup -----
