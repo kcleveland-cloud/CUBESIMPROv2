@@ -1109,6 +1109,24 @@ with st.sidebar:
     auth_name = (user or {}).get("name", "")
     auth_pic = (user or {}).get("picture")
 
+    # --- Logout Button ---
+    logout_url = auth0_logout_url()
+
+    if st.button("Log out"):
+        # Clear Streamlit session completely
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+
+        # Redirect browser to Auth0 logout endpoint
+        st.markdown(
+            f"""
+            <meta http-equiv="refresh" content="0; url={logout_url}">
+            """,
+            unsafe_allow_html=True,
+        )
+        st.stop()
+
+    
     acct_col1, acct_col2 = st.columns([1, 2])
     with acct_col1:
         if auth_pic:
