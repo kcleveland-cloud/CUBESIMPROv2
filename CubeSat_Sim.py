@@ -50,7 +50,7 @@ AUTH0_CLIENT_ID = CONFIG["AUTH0_CLIENT_ID"]
 AUTH0_CLIENT_SECRET = CONFIG["AUTH0_CLIENT_SECRET"]
 AUTH0_CALLBACK_URL = CONFIG["AUTH0_CALLBACK_URL"]
 AUTH0_AUDIENCE = "https://catsim-backend-api"
-
+APP_BASE_URL = "https://cubesimprov2-noruuoxdtsrjzdskhuobbr.streamlit.app/"
 
 
 # =========================
@@ -127,9 +127,13 @@ def auth0_logout_url():
 
 
 def login_button():
-    """Show a clickable link to Auth0."""
-    url = auth0_login_url()
-    st.markdown(f"[Click here to sign in]({url})")
+    auth_url = build_auth0_authorize_url()
+    if st.button("Sign in"):
+        st.markdown(
+            f'<meta http-equiv="refresh" content="0; url={auth_url}">',
+            unsafe_allow_html=True,
+        )
+        st.stop()
 
 
 def _exchange_code_for_tokens(code: str):
@@ -225,6 +229,29 @@ def start_checkout(tier: str):
             except Exception:
                 st.write("Debug checkout exception:", str(e))
 
+def logout_button():
+    # Auth0 logout URL – kills the Auth0 SSO session
+    logout_url = (
+        f"https://{AUTH0_DOMAIN}/v2/logout?"
+        f"client_id={AUTH0_CLIENT_ID}&"
+        f"returnTo={urllib.parse.quote_plus(APP_BASE_URL)}"
+    )
+
+    if st.sidebar.button("Log out"):  # or wherever your logout button lives
+        # 1) Clear Streamlit session
+        st.session_state.clear()
+
+        # 2) Clear URL query params (old code/state)
+        st.experimental_set_query_params()
+
+        # 3) Redirect the browser to Auth0 logout
+        st.markdown(
+            f"""
+            <meta http-equiv="refresh" content="0; url={logout_url}">
+            """,
+            unsafe_allow_html=True,
+        )
+        st.stop()
 
 # =========================
 # Brand CSS
