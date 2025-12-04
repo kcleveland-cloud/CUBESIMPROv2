@@ -23,6 +23,7 @@ PRO_MONTHLY_LINK = os.getenv("CATSIM_PRO_MONTHLY_LINK", "https://buy.stripe.com/
 PRO_YEARLY_LINK  = os.getenv("CATSIM_PRO_YEARLY_LINK", "https://buy.stripe.com/dRmbJ17St8jK9mUeWR1RC03")
 ACADEMIC_LINK    = os.getenv("CATSIM_ACAD_LINK", "https://buy.stripe.com/dRm9AT7StarS56E7up1RC04")   # optional
 DEPT_LINK        = os.getenv("CATSIM_DEPT_LINK", "https://buy.stripe.com/4gM5kD5Kl9nO7eMaGB1RC05")   # optional
+BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "https://your-render-backend.onrender.com")
 
 
 
@@ -86,7 +87,36 @@ BACKEND_BASE = os.getenv(
     "http://127.0.0.1:8000",  # change to your deployed backend URL in prod
 )
 
+def get_billing_portal_url(user):
+    """
+    Call backend /create-portal-session and return the Stripe billing portal URL.
+    `user` should be your Auth0 user dict or similar so you can pass an identifier.
+    """
+    if user is None:
+        return None
 
+    try:
+        # Adjust payload to match what your backend expects
+        payload = {
+            "auth0_sub": user.get("sub"),          # or "user_id"
+            "email": user.get("email"),            # optional, if your backend uses email
+        }
+
+        resp = requests.post(
+            f"{BACKEND_BASE_URL}/create-portal-session",
+            json=payload,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("url")
+    except Exception as e:
+        st.sidebar.error("Could not open billing portal. Please contact support if this persists.")
+        # If you want debug info in dev:
+        if os.getenv("CATSIM_ENV", "dev") == "dev":
+            st.sidebar.write(str(e))
+        return None
+        
 def sync_user_with_backend(user: dict) -> None:
     """
     Best-effort sync of Auth0 identity into the backend DB.
@@ -1109,6 +1139,31 @@ with st.sidebar:
     auth_name = (user or {}).get("name", "")
     auth_pic = (user or {}).get("picture")
 
+  # --- New: Manage billing & invoices button ---
+    if user is not None:
+        portal_url = get_billing_portal_url(user)
+        if portal_url:
+            # Streamlit 1.31+ has link_button; otherwise use markdown link
+            try:
+                st.link_button(
+                    "Manage billing & invoices",
+                    portal_url,
+                    use_container_width=True,
+                    type="secondary",
+                )
+            except AttributeError:
+                # Fallback for older Streamlit
+                st.markdown(
+                    f"<a href='{portal_url}' target='_blank'>"
+                    "<button style='width:100%; padding:0.5rem 1rem; border-radius:0.5rem;"
+                    "border:1px solid #ccc; background-color:white; cursor:pointer;'>"
+                    "Manage billing & invoices"
+                    "</button></a>",
+                    unsafe_allow_html=True,
+                )
+    else:
+        st.caption("Sign in to manage your subscription.")
+    
     # --- Logout Button ---
     logout_url = auth0_logout_url()
 
