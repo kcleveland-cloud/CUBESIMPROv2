@@ -90,35 +90,38 @@ BACKEND_BASE = os.getenv(
     "http://127.0.0.1:8000",  # change to your deployed backend URL in prod
 )
 
-def get_billing_portal_url(user):
+def get_billing_portal_url(user: dict | None) -> str | None:
     """
     Call backend /create-portal-session and return the Stripe billing portal URL.
-    `user` should be your Auth0 user dict or similar so you can pass an identifier.
     """
     if user is None:
         return None
 
     try:
-        # Adjust payload to match what your backend expects
+        # IMPORTANT: match backend expectation exactly
         payload = {
-            "auth0_sub": user.get("sub"),          # or "user_id"
-            "email": user.get("email"),            # optional, if your backend uses email
+            "user_id": user.get("sub"),   # Auth0 subject as stable user id
         }
 
         resp = requests.post(
-            f"{BACKEND_BASE_URL}/create-portal-session",
+            api_url("/create-portal-session"),
             json=payload,
             timeout=10,
         )
         resp.raise_for_status()
         data = resp.json()
         return data.get("url")
+
     except Exception as e:
         st.sidebar.error("Could not open billing portal. Please contact support if this persists.")
-        # If you want debug info in dev:
         if os.getenv("CATSIM_ENV", "dev") == "dev":
-            st.sidebar.write(str(e))
+            # show backend's error message if it's a 400
+            try:
+                st.sidebar.write("Debug:", resp.text)
+            except Exception:
+                st.sidebar.write(str(e))
         return None
+
         
 def sync_user_with_backend(user: dict) -> None:
     """
