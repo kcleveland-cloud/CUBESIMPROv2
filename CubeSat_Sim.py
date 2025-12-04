@@ -1295,95 +1295,92 @@ with st.sidebar:
 
     st.divider()
 
-    # -------------------------
-    # Plan & Billing
-    # -------------------------
-    st.markdown("### Plan & Billing")
+# ----- Plan & Billing section -----
 
-    # Dev-only simulated plan controls (optional override)
-    if CONFIG.get("SHOW_DEV_PLAN_SIM", False):
-        with st.expander("Developer: simulate subscription", expanded=False):
-            st.markdown(
-                "<div style='font-size:0.75rem; color:#888;'>"
-                "Overrides the real subscription in dev only."
-                "</div>",
-                unsafe_allow_html=True,
-            )
+st.markdown("### Plan & Billing")
 
-            dev_choice = st.radio(
-                "Simulated plan",
-                ["Use real plan", "Trial", "Standard", "Pro"],
-                index=0,
-                key="dev_plan_choice",
-            )
+# 1) Fetch REAL subscription state from backend
+sub_state: dict = {}
+try:
+    # assume you already have the logged-in Auth0 sub in user_info["sub"]
+    auth0_sub = st.session_state.get("auth0_sub") or user_info["sub"]
 
-            if st.button("Apply dev plan"):
-                if dev_choice == "Trial":
-                    st.session_state.plan_base = "trial"
-                    st.session_state.trial_start = dt.date.today().isoformat()
-                    st.session_state.in_trial = True
-                    st.session_state.effective_plan = "standard"
-                elif dev_choice == "Standard":
-                    st.session_state.plan_base = "standard"
-                    st.session_state.in_trial = False
-                    st.session_state.effective_plan = "standard"
-                elif dev_choice == "Pro":
-                    st.session_state.plan_base = "pro"
-                    st.session_state.in_trial = False
-                    st.session_state.effective_plan = "pro"
-                st.rerun()
+    resp = requests.get(
+        f"{BACKEND_URL}/subscription-state",
+        params={"auth0_sub": auth0_sub},
+        timeout=10,
+    )
+    resp.raise_for_status()
+    data = resp.json() or {}
+    sub_state = data.get("subscription") or {}
+except Exception as e:
+    print("subscription_state error:", repr(e))
+    sub_state = {}
 
-# sub_state is what you got from backend /subscription-state
-# e.g., response["subscription"]
-plan_label, end_text = describe_subscription(sub_state)
+effective_state = dict(sub_state)  # we may override this in dev
 
-with st.container():
-    st.markdown(
-        f"""
-        <div style="border-radius: 8px; padding: 12px 16px; background-color: #f5f9ff; border: 1px solid #c3d5ff;">
-            <div style="font-weight: 600; margin-bottom: 4px;">
-                Current plan: 🚀 {plan_label}
-            </div>
-            <div style="font-size: 0.9rem; color: #444;">
-                {end_text}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+# 2) Developer override (what you already have in the UI)
+DEV_SIM_KEY = "dev_simulated_plan"
+
+with st.expander("Developer: simulate subscription"):
+    st.caption("Overrides the real subscription in dev only.")
+    sim_choice = st.radio(
+        "Simulated plan",
+        ["Use real plan", "Trial", "Standard", "Pro"],
+        index=0,
+        key="dev_sim_choice_radio",
     )
 
+    if st.button("Apply dev plan"):
+        st.session_state[DEV_SIM_KEY] = sim_choice
 
-    # Optional: dev-only detailed pricing copy
-    if DEV_MODE:
-        with st.expander("🧭 Full pricing structure (dev)", expanded=False):
-            st.markdown(
-                """
-**Free Trial**
-- 30 days, no credit card  
-- Full Standard + optional 7-day Pro preview  
+# Apply override ONLY in dev and ONLY if not "Use real plan"
+sim_choice_effective = st.session_state.get(DEV_SIM_KEY, "Use real plan")
 
-**Standard — $9.99/mo or $99/yr**
-- For students, hobbyists, early CubeSat teams.  
+if DEV_MODE and sim_choice_effective != "Use real plan":
+    # Build a fake sub_state for display purposes
+    today = dt.date.today()
+    fake_end = today + dt.timedelta(days=30)
 
-**Pro — $19.99/mo or $199/yr**
-- For smallsat startups, SBIR teams, and professional engineers.  
+    if sim_choice_effective == "Trial":
+        effective_state = {
+            "plan_key": "standard_monthly",
+            "human_readable": "Standard Monthly",
+            "status": "trialing",
+            "current_period_end": fake_end.isoformat(),
+        }
+    elif sim_choice_effective == "Standard":
+        effective_state = {
+            "plan_key": "standard_monthly",
+            "human_readable": "Standard Monthly",
+            "status": "active",
+            "current_period_end": fake_end.isoformat(),
+        }
+    elif sim_choice_effective == "Pro":
+        effective_state = {
+            "plan_key": "pro_monthly",
+            "human_readable": "Pro Monthly",
+            "status": "active",
+            "current_period_end": fake_end.isoformat(),
+        }
+# else: effective_state stays as the real Stripe-driven sub_state
 
-**Academic Pro — $99/year**
-- For verified students and faculty.  
+# 3) Render the blue "Current plan" card using describe_subscription()
+plan_label, end_text = describe_subscription(effective_state)
 
-**Department License — $499/year**
-- Unlimited seats for university programs and aerospace labs.
-                """
-            )
-
-    # Billing portal (if we know the Stripe customer)
-    if st.session_state.get("stripe_customer_id"):
-        if st.button("Manage billing & invoices"):
-            # 🔄 spinner while we create portal session
-            with st.spinner("Opening secure Stripe billing portal..."):
-                url = create_billing_portal(st.session_state.stripe_customer_id)
-            if url:
-                st.session_state.checkout_url = url
+st.markdown(
+    f"""
+    <div style="border-radius: 8px; padding: 12px 16px; background-color: #f5f9ff; border: 1px solid #c3d5ff; margin-bottom: 8px;">
+        <div style="font-weight: 600; margin-bottom: 4px;">
+            Current plan: 🚀 {plan_label}
+        </div>
+        <div style="font-size: 0.9rem; color: #444;">
+            {end_text}
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
     # -------------------------
     # Upgrade buttons + spinner
