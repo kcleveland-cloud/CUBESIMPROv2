@@ -23,7 +23,7 @@ PRO_MONTHLY_LINK = os.getenv("CATSIM_PRO_MONTHLY_LINK", "https://buy.stripe.com/
 PRO_YEARLY_LINK  = os.getenv("CATSIM_PRO_YEARLY_LINK", "https://buy.stripe.com/dRmbJ17St8jK9mUeWR1RC03")
 ACADEMIC_LINK    = os.getenv("CATSIM_ACAD_LINK", "https://buy.stripe.com/dRm9AT7StarS56E7up1RC04")   # optional
 DEPT_LINK        = os.getenv("CATSIM_DEPT_LINK", "https://buy.stripe.com/4gM5kD5Kl9nO7eMaGB1RC05")   # optional
-BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "https://your-render-backend.onrender.com")
+BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "https://catsim-backend.onrender.com/")
 
 
 
