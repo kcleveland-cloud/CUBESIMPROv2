@@ -1229,6 +1229,7 @@ st.session_state.stripe_customer_id = customer_id
 
 
 
+# ----- SIDEBAR: account + plan + sim setup -----
 with st.sidebar:
     # -------------------------
     # Account
@@ -1239,11 +1240,10 @@ with st.sidebar:
     auth_name = (user or {}).get("name", "")
     auth_pic = (user or {}).get("picture")
 
-  # --- New: Manage billing & invoices button ---
+    # Manage billing portal
     if user is not None:
         portal_url = get_billing_portal_url(user)
         if portal_url:
-            # Streamlit 1.31+ has link_button; otherwise use markdown link
             try:
                 st.link_button(
                     "Manage billing & invoices",
@@ -1252,7 +1252,6 @@ with st.sidebar:
                     type="secondary",
                 )
             except AttributeError:
-                # Fallback for older Streamlit
                 st.markdown(
                     f"<a href='{portal_url}' target='_blank'>"
                     "<button style='width:100%; padding:0.5rem 1rem; border-radius:0.5rem;"
@@ -1263,25 +1262,19 @@ with st.sidebar:
                 )
     else:
         st.caption("Sign in to manage your subscription.")
-    
-    # --- Logout Button ---
-    logout_url = auth0_logout_url()
 
+    # Logout
+    logout_url = auth0_logout_url()
     if st.button("Log out"):
-        # Clear Streamlit session completely
         for key in list(st.session_state.keys()):
             del st.session_state[key]
-
-        # Redirect browser to Auth0 logout endpoint
         st.markdown(
-            f"""
-            <meta http-equiv="refresh" content="0; url={logout_url}">
-            """,
+            f"<meta http-equiv='refresh' content='0; url={logout_url}'>",
             unsafe_allow_html=True,
         )
         st.stop()
 
-    
+    # Avatar + name
     acct_col1, acct_col2 = st.columns([1, 2])
     with acct_col1:
         if auth_pic:
@@ -1295,81 +1288,53 @@ with st.sidebar:
 
     st.divider()
 
-# ----- Plan & Billing section -----
+    # -------------------------
+    # Plan & Billing
+    # -------------------------
+    st.markdown("### Plan & Billing")
 
-st.markdown("### Plan & Billing")
+    # Work out a simple label/end text using backend state + local trial
+    if sub and sub.get("plan") in ("standard", "pro"):
+        plan_name = sub.get("plan", "standard").title()
+        status = (sub.get("status") or "active").title()
+        end_dt_str = sub.get("current_period_end")
+        if end_dt_str:
+            try:
+                end_date = dt.date.fromisoformat(end_dt_str[:10])
+                end_text = (
+                    f"Renews: {end_date.isoformat()}"
+                    if status.lower() == "active"
+                    else f"Ends: {end_date.isoformat()}"
+                )
+            except Exception:
+                end_text = ""
+        else:
+            end_text = ""
+        label = f"{plan_name} ({status})"
+    else:
+        if in_trial:
+            label = "Trial (Standard)"
+            end_text = f"Trial ends: {trial_end.isoformat()}"
+        else:
+            label = "Free (Standard features only)"
+            end_text = ""
 
-# ------------------------
-# 1. Fetch subscription state
-# ------------------------
-try:
-    auth0_sub = st.session_state.get("auth0_sub") or user_info["sub"]
-    resp = requests.get(
-        f"{BACKEND_URL}/subscription-state",
-        params={"auth0_sub": auth0_sub},
-        timeout=10,
+    st.markdown(
+        f"""
+        <div style="padding: 12px; background: #f5f9ff; border: 1px solid #c3d5ff;">
+            <b>Current plan:</b> 🚀 {label}<br>
+            {end_text}
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
-    resp.raise_for_status()
-    data = resp.json() or {}
-    sub_state = data.get("subscription") or {}
-except Exception as e:
-    print("subscription_state error:", repr(e))
-    sub_state = {}
-
-effective_state = dict(sub_state)
-
-# ------------------------
-# 2. Developer override
-# ------------------------
-with st.expander("Developer: simulate subscription"):
-    sim_choice = st.radio(
-        "Simulated plan",
-        ["Use real plan", "Trial", "Standard", "Pro"],
-        index=0,
-    )
-
-    if st.button("Apply dev plan"):
-        st.session_state["dev_sim_plan"] = sim_choice
-
-sim_choice_effective = st.session_state.get("dev_sim_plan", "Use real plan")
-
-if DEV_MODE and sim_choice_effective != "Use real plan":
-    # build fake plan here...
-    effective_state = {
-        "plan_key": "pro_monthly",
-        "status": "active",
-        "current_period_end": "2025-01-03",
-    }
-
-# ------------------------
-# 3. Current plan card
-# ------------------------
-plan_label, end_text = describe_subscription(effective_state)
-
-st.markdown(
-    f"""
-    <div style="padding: 12px; background: #f5f9ff; border: 1px solid #c3d5ff;">
-        <b>Current plan:</b> 🚀 {plan_label}<br>
-        {end_text}
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-# ------------------------
-# 4. Your plan_base logic (this is where it belongs)
-# ------------------------
-if "plan_base" not in st.session_state:
-    st.session_state.plan_base = None
-
-if st.session_state.plan_base != "pro":
-    st.warning("Pro features are locked. Upgrade to Pro to enable.")
-
 
     # -------------------------
-    # Upgrade buttons + spinner
+    # Upgrade buttons
     # -------------------------
-    if st.session_state.plan_base != "pro":
+    if plan_effective != "pro":
+        st.warning("Pro features are locked. Upgrade to Pro to enable.")
+
         st.markdown("### Upgrade")
 
         col_a, col_b = st.columns(2)
@@ -1429,28 +1394,17 @@ if st.session_state.plan_base != "pro":
     else:
         st.success("✅ You are on the Pro plan.")
 
-    # -------------------------
-    # Checkout link (now in sidebar)
-    # -------------------------
+    # Checkout link (still in sidebar)
     if st.session_state.get("checkout_url"):
         st.markdown("### Checkout / Billing")
         st.info(
-            "✅ Click below to open secure Stripe checkout / billing.  "
+            "✅ Click below to open secure Stripe checkout / billing. "
             "After completing payment, refresh CATSIM to update your plan."
         )
         st.markdown(f"[Open Stripe]({st.session_state.checkout_url})")
 
     # -------------------------
-    # Simulation setup (unchanged)
-    # -------------------------
-    st.divider()
-    st.markdown("### Simulation setup")
-    # ... (rest of your sidebar controls)
-
-
-
-    # -------------------------
-    # Simulation Setup
+    # Simulation setup
     # -------------------------
     st.divider()
     st.markdown("### Simulation setup")
@@ -1523,6 +1477,7 @@ if st.session_state.plan_base != "pro":
     show_play = st.checkbox("Show Play buttons on plots", True)
     anim_speed = st.slider("Animation speed (Plotly)", 0.1, 5.0, 1.0, 0.1)
     mission_days = st.slider("Mission duration (days)", 1, 365, 60)
+
 
 
 # =========================
