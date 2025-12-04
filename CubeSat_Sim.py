@@ -326,7 +326,65 @@ def get_user():
 
     return None
 
+def describe_subscription(sub_state: dict):
+    """
+    Turn backend subscription state into (label, end_date_text) for the UI.
+    sub_state is what /subscription-state returns:
+      {
+        "plan_key": "pro_monthly",
+        "human_readable": "Pro Monthly",
+        "status": "active",
+        "current_period_end": "2026-01-03T12:34:56+00:00" or None
+      }
+    """
+    plan_key = sub_state.get("plan_key")
+    status = (sub_state.get("status") or "").lower()
+    human = sub_state.get("human_readable") or ""
 
+    # No Stripe subscription → you're in dev trial / free
+    if not plan_key:
+        label = "Trial (Standard)"
+        end_text = "Ends: 2026-01-03"  # keep your dev placeholder if you want
+        return label, end_text
+
+    # Map plan_key to UI labels
+    if plan_key.startswith("pro_"):
+        label = "Pro"
+    elif plan_key.startswith("standard_"):
+        label = "Standard"
+    elif plan_key == "academic_yearly":
+        label = "Academic Pro"
+    elif plan_key == "dept_yearly":
+        label = "Department License"
+    else:
+        label = human or plan_key
+
+    # Show status (trialing vs active)
+    if status == "trialing":
+        label = f"Trial ({label})"
+
+    # Format end date if present
+    end_dt = sub_state.get("current_period_end")
+    end_text = ""
+    if end_dt:
+        # end_dt may already be a datetime; if it's a string, parse date part
+        if isinstance(end_dt, str):
+            try:
+                end_date = dt.date.fromisoformat(end_dt[:10])
+            except Exception:
+                end_date = None
+        elif isinstance(end_dt, dt.datetime):
+            end_date = end_dt.date()
+        else:
+            end_date = None
+
+        if end_date:
+            if status == "trialing":
+                end_text = f"Trial ends: {end_date.isoformat()}"
+            else:
+                end_text = f"Renews: {end_date.isoformat()}"
+
+    return label, end_text
 
 
 def get_user():
@@ -1275,43 +1333,25 @@ with st.sidebar:
                     st.session_state.effective_plan = "pro"
                 st.rerun()
 
-    # Current plan badge
-    if st.session_state.in_trial:
-        st.markdown(
-            f"""
-            <div style="
-                padding:0.6rem 0.8rem;
-                border-radius:0.75rem;
-                background:rgba(59,130,246,0.08);
-                border:1px solid rgba(59,130,246,0.35);
-                font-size:0.85rem;
-            ">
-                <strong>Current plan:</strong> 🧪 Trial (Standard)<br>
-                Ends: <strong>{st.session_state.trial_end}</strong>
+# sub_state is what you got from backend /subscription-state
+# e.g., response["subscription"]
+plan_label, end_text = describe_subscription(sub_state)
+
+with st.container():
+    st.markdown(
+        f"""
+        <div style="border-radius: 8px; padding: 12px 16px; background-color: #f5f9ff; border: 1px solid #c3d5ff;">
+            <div style="font-weight: 600; margin-bottom: 4px;">
+                Current plan: 🚀 {plan_label}
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.caption(
-            "30-day free trial includes full Standard features. "
-            "Pro features (Advanced Analysis, Save/Load & Export) require a Pro subscription."
-        )
-    else:
-        label = st.session_state.plan_base.capitalize()
-        st.markdown(
-            f"""
-            <div style="
-                padding:0.6rem 0.8rem;
-                border-radius:0.75rem;
-                background:rgba(15,23,42,0.03);
-                border:1px solid rgba(148,163,184,0.5);
-                font-size:0.85rem;
-            ">
-                <strong>Current plan:</strong> {label}
+            <div style="font-size: 0.9rem; color: #444;">
+                {end_text}
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 
     # Optional: dev-only detailed pricing copy
     if DEV_MODE:
