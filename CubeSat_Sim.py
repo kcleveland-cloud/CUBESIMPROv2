@@ -78,6 +78,45 @@ def auth0_login_url():
     return f"https://{AUTH0_DOMAIN}/authorize?" + urllib.parse.urlencode(params)
 
 
+BACKEND_BASE_URL = os.getenv(
+    "BACKEND_BASE_URL",
+    "https://catsim-backend.onrender.com"  # your real backend URL
+)
+
+def api_url(path: str) -> str:
+    return f"{BACKEND_BASE_URL.rstrip('/')}{path}"
+
+def get_billing_portal_url(user) -> str | None:
+    """
+    Ask backend for a Stripe Billing Portal URL for this user.
+    """
+    if not user:
+        return None
+
+    payload = {
+        "user_id": user.get("sub"),      # Auth0 subject
+        "email": user.get("email"),      # Auth0 email (helps find Stripe customer)
+    }
+
+    try:
+        resp = requests.post(
+            api_url("/create-portal-session"),
+            json=payload,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("url")
+    except Exception as e:
+        st.sidebar.error("Could not open billing portal. Please contact support if this persists.")
+        if os.getenv("CATSIM_ENV", "dev") == "dev":
+            # Show backend status + body for debugging
+            try:
+                st.sidebar.write("Debug portal:", resp.status_code, resp.text)
+            except Exception:
+                st.sidebar.write("Debug portal exception:", str(e))
+        return None
+
 def auth0_logout_url():
     """Optional: Auth0 logout URL."""
     params = {
@@ -902,7 +941,22 @@ with st.sidebar:
     st.caption(auth_email)
 
     st.header("Plan & Billing")
+    
+    st.markdown("### Account")
 
+    user = st.session_state.get("user")  # however you store Auth0 user
+
+    if user:
+        portal_url = get_billing_portal_url(user)
+        if portal_url:
+            st.link_button(
+                "Manage billing & invoices",
+                portal_url,
+                use_container_width=True,
+                type="secondary",
+            )
+    else:
+        st.caption("Sign in to manage your subscription.")
     # Dev-only simulated plan controls
     if CONFIG.get("SHOW_DEV_PLAN_SIM", False):
         st.markdown(
