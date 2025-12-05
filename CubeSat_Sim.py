@@ -1393,7 +1393,7 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    # -------------------------
+       # -------------------------
     # Upgrade buttons
     # -------------------------
     if plan_effective != "pro":
@@ -1431,50 +1431,53 @@ with st.sidebar:
                 if url:
                     st.session_state.checkout_url = url
 
-            st.markdown("**Education & teams:**")
-    col_c, col_d = st.columns(2)
+        # -------------------------
+        # Education & teams
+        # -------------------------
+        st.markdown("**Education & teams:**")
+        col_c, col_d = st.columns(2)
 
-    # Check if the signed-in user has a .edu email
-    edu_ok = is_edu_email(auth_email)
+        # Check if the signed-in user has a .edu email
+        edu_ok = is_edu_email(auth_email)
 
-    with col_c:
-        if not edu_ok:
-            # Disabled Academic button + explanation
-            st.button(
-                "Academic Pro $99/yr (.edu only)",
-                key="academic_disabled",
-                help="Academic license (requires .edu email)",
-                disabled=True,
-            )
-            st.caption(
-                f"Academic pricing is reserved for users with a valid .edu email address. "
-                f"Current email: `{auth_email}`"
-            )
-        else:
-            # Only .edu users can actually start Academic checkout
+        with col_c:
+            if not edu_ok:
+                # Disabled Academic button + explanation
+                st.button(
+                    "Academic Pro $99/yr (.edu only)",
+                    key="academic_disabled",
+                    help="Academic license (requires .edu email)",
+                    disabled=True,
+                )
+                st.caption(
+                    f"Academic pricing is reserved for users with a valid .edu email address. "
+                    f"Current email: `{auth_email}`"
+                )
+            else:
+                # Only .edu users can actually start Academic checkout
+                if st.button(
+                    "Academic Pro $99/yr",
+                    key="academic",
+                    help="Academic license",
+                ):
+                    with st.spinner("Contacting secure Stripe checkout..."):
+                        url = create_checkout_session("academic_yearly", auth_email)
+                    if url:
+                        st.session_state.checkout_url = url
+
+        with col_d:
             if st.button(
-                "Academic Pro $99/yr",
-                key="academic",
-                help="Academic license",
+                "Dept License $499/yr",
+                key="dept",
+                help="Department license",
             ):
                 with st.spinner("Contacting secure Stripe checkout..."):
-                    url = create_checkout_session("academic_yearly", auth_email)
+                    url = create_checkout_session("dept_yearly", auth_email)
                 if url:
                     st.session_state.checkout_url = url
-
-    with col_d:
-        if st.button(
-            "Dept License $499/yr",
-            key="dept",
-            help="Department license",
-        ):
-            with st.spinner("Contacting secure Stripe checkout..."):
-                url = create_checkout_session("dept_yearly", auth_email)
-            if url:
-                st.session_state.checkout_url = url
-
     else:
         st.success("✅ You are on the Pro plan.")
+
 
     # Checkout link (still in sidebar)
     if st.session_state.get("checkout_url"):
