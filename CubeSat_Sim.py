@@ -148,6 +148,125 @@ def get_billing_portal_url(user) -> str | None:
                 st.sidebar.write("Debug portal exception:", str(e))
         return None
 
+# -------------------------
+# Backend subscription + checkout helpers
+# -------------------------
+
+def fetch_subscription_state(auth0_sub: str | None, email: str | None = None) -> dict:
+    """
+    Ask the FastAPI backend for this user's subscription state.
+
+    Returns a dict like:
+      {
+        "plan_key": "pro_monthly",
+        "human_readable": "Pro Monthly",
+        "status": "active",
+        "current_period_end": "2026-01-03T12:34:56+00:00" or None
+      }
+
+    On error, returns {} and stays silent in production.
+    """
+    if not auth0_sub and not email:
+        return {}
+
+    payload = {
+        "user_id": auth0_sub,
+        "email": email,
+    }
+
+    try:
+        resp = requests.post(
+            api_url("/subscription-state"),
+            json=payload,
+            timeout=5,
+        )
+        resp.raise_for_status()
+        data = resp.json() or {}
+
+        # Backend returns {"ok": True, "subscription": {...}}
+        sub = data.get("subscription") or data
+        return sub
+    except Exception as e:
+        # Non-fatal: just fall back to local trial behaviour
+        if os.getenv("CATSIM_ENV", "dev") == "dev":
+            try:
+                st.sidebar.warning(f"Sub-state fetch failed: {e}")
+            except Exception:
+                pass
+        return {}
+
+
+def normalize_subscription_state(raw: dict | None) -> dict:
+    """
+    Normalize whatever we got from backend into a clean dict the UI expects.
+    Ensures keys: plan_key, human_readable, status, current_period_end (ISO string or None).
+    """
+    if not raw:
+        return {}
+
+    # If wrapped one more level, unwrap: {"subscription": {...}}
+    if "subscription" in raw and isinstance(raw["subscription"], dict):
+        raw = raw["subscription"]
+
+    plan_key = raw.get("plan_key")
+    human = raw.get("human_readable") or ""
+    status = raw.get("status") or ""
+    cpe = raw.get("current_period_end")
+
+    # Standardise current_period_end to an ISO string if it's a datetime
+    if cpe is not None and not isinstance(cpe, str):
+        try:
+            # datetime → ISO
+            cpe = cpe.isoformat()
+        except Exception:
+            # if it's a timestamp or something odd, just drop it
+            cpe = None
+
+    return {
+        "plan_key": plan_key,
+        "human_readable": human,
+        "status": status,
+        "current_period_end": cpe,
+    }
+
+
+def create_checkout_session(plan_key: str, email: str, name: str | None = None,
+                             auth0_sub: str | None = None) -> str | None:
+    """
+    Frontend wrapper that asks backend to create a Stripe Checkout Session.
+
+    Returns the checkout URL on success, or None on error.
+    """
+    payload = {
+        "plan_key": plan_key,   # e.g. "pro_monthly"
+        "email": email,
+        "name": name,
+        "user_id": auth0_sub,
+    }
+
+    try:
+        resp = requests.post(
+            api_url("/create-checkout-session"),
+            json=payload,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json() or {}
+        return data.get("url")
+    except Exception as e:
+        st.error("Checkout error: Could not start Stripe checkout.")
+        if os.getenv("CATSIM_ENV", "dev") == "dev":
+            try:
+                st.write("Debug checkout error:", e)
+                try:
+                    st.write("Response:", resp.status_code, resp.text)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+        return None
+
+
 def sync_user_with_backend(user):
     """
     Best-effort sync of the Auth0 user into the FastAPI backend.
