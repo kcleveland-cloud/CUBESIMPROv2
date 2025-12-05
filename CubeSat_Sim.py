@@ -47,13 +47,8 @@ def api_url(path: str) -> str:
 # =========================
 # Environment: dev vs prod
 # =========================
-# Streamlit Cloud:
-#   - Dev app:  CATSIM_ENV=dev
-#   - Prod app: CATSIM_ENV=prod
-ENV = "dev"
-DEV_MODE = True
-IS_DEV = True
-
+ENV = os.getenv("CATSIM_ENV", "prod")  # "dev" or "prod"
+IS_DEV = ENV != "prod"
 
 CONFIG = {
     "dev": {
@@ -73,10 +68,7 @@ CONFIG = {
         # TODO: replace these with your production Auth0 app settings
         "AUTH0_DOMAIN": os.getenv("dev-qwn3runpmc616as6.us.auth0.com"),
         "AUTH0_CLIENT_ID": os.getenv("XvRZKwcHlcToRYGMMwnZiNjLnNzJmUmU"),
-        "AUTH0_CLIENT_SECRET": os.getenv(
-            "AUTH0_CLIENT_SECRET_PROD",
-            "E9BAjy7QLsJ0GSAYPMoBvb-vg7lMeLObKBqdsBupoQoVcVUHM75hmXOSDm2jzuw7",
-        ),
+        "AUTH0_CLIENT_SECRET": os.getenv("AUTH0_CLIENT_SECRET_PROD", "y7Sn91jH3sR1seU5uWPJAM89BSmS-pXfPQPcfDLzt_K3Cu2fk-D0vzYnA2sE2lah"),
         "AUTH0_CALLBACK_URL": os.getenv(
             "AUTH0_CALLBACK_URL_PROD",
             "https://cubesimprov2-lt6hcgkvpdvygnwbktyqdg.streamlit.app",
@@ -90,170 +82,8 @@ AUTH0_CLIENT_ID = CONFIG["AUTH0_CLIENT_ID"]
 AUTH0_CLIENT_SECRET = CONFIG["AUTH0_CLIENT_SECRET"]
 AUTH0_CALLBACK_URL = CONFIG["AUTH0_CALLBACK_URL"]
 AUTH0_AUDIENCE = "https://catsim-backend-api"
+APP_BASE_URL = "https://cubesimprov2-noruuoxdtsrjzdskhuobbr.streamlit.app/"
 
-# =========================
-# CATSIM Backend (Stripe + subscription API)
-# =========================
-
-# =========================
-# CATSIM Backend (Stripe + subscription API)
-# =========================
-
-BACKEND_BASE = os.getenv(
-    "CATSIM_BACKEND_URL",
-    "http://127.0.0.1:8000",  # change to your deployed backend URL in prod
-)
-
-def get_billing_portal_url(user: dict | None) -> str | None:
-    """
-    Call backend /create-portal-session and return the Stripe billing portal URL.
-    """
-    if user is None:
-        return None
-
-    try:
-        # IMPORTANT: match backend expectation exactly
-        payload = {
-            "user_id": user.get("sub"),   # Auth0 subject as stable user id
-        }
-
-        resp = requests.post(
-            api_url("/create-portal-session"),
-            json=payload,
-            timeout=10,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data.get("url")
-
-    except Exception as e:
-        st.sidebar.error("Could not open billing portal. Please contact support if this persists.")
-        if os.getenv("CATSIM_ENV", "dev") == "dev":
-            # show backend's error message if it's a 400
-            try:
-                st.sidebar.write("Debug:", resp.text)
-            except Exception:
-                st.sidebar.write(str(e))
-        return None
-
-def normalize_subscription_state(raw: dict | None) -> dict:
-    """
-    Accepts whatever the backend /subscription-state returns and
-    pulls out the actual subscription dict.
-
-    Handles both:
-      { "plan_key": "...", "status": "...", ... }
-    and
-      { "subscription": { "plan_key": "...", ... } }
-    """
-    if not isinstance(raw, dict):
-        return {}
-
-    # If wrapped in {"subscription": {...}}
-    inner = raw.get("subscription")
-    if isinstance(inner, dict):
-        return inner
-
-    return raw
-
-
-
-def sync_user_with_backend(user: dict) -> None:
-    """
-    Best-effort sync of Auth0 identity into the backend DB.
-
-    Backend endpoint: POST /sync-user
-      body:
-        {
-          "auth0_sub": "...",
-          "email": "...",
-          "stripe_customer_id": "cus_xxx" (optional)
-        }
-    """
-    if not BACKEND_BASE or not user:
-        return
-
-    try:
-        payload = {
-            "auth0_sub": user.get("sub"),
-            "email": user.get("email"),
-            "stripe_customer_id": st.session_state.get("stripe_customer_id"),
-        }
-        # Don't explode the app if backend is down
-        requests.post(
-            f"{BACKEND_BASE}/sync-user",
-            json=payload,
-            timeout=5,
-        )
-    except Exception:
-        # Silent fail; user can still run in local-trial mode
-        return
-
-
-def fetch_subscription_state(auth0_sub: str) -> dict | None:
-    """
-    Ask the backend what plan this Auth0 user is on.
-
-    Backend endpoint: GET /subscription-state?auth0_sub=...
-    Expected JSON (example):
-      {
-        "plan": "standard" | "pro" | "none",
-        "status": "active" | "trialing" | "canceled" | ...,
-        "price_id": "price_xxx" | null,
-        "current_period_end": "2025-01-01T00:00:00Z" | null,
-        "customer_id": "cus_xxx" | null
-      }
-    """
-    if not BACKEND_BASE or not auth0_sub:
-        return None
-
-    try:
-        resp = requests.get(
-            f"{BACKEND_BASE}/subscription-state",
-            params={"auth0_sub": auth0_sub},
-            timeout=5,
-        )
-        if resp.status_code == 200:
-            return resp.json()
-    except Exception:
-        return None
-    return None
-
-
-def create_checkout_session(plan_key: str, email: str) -> str | None:
-    """Create a Stripe Checkout Session for a given plan + email."""
-    if not BACKEND_BASE:
-        return None
-    try:
-        resp = requests.post(
-            f"{BACKEND_BASE}/create-checkout-session",
-            json={"plan_key": plan_key, "email": email},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data.get("url")
-    except Exception as e:
-        st.error(f"Checkout error: {e}")
-        return None
-
-
-def create_billing_portal(customer_id: str) -> str | None:
-    """Create a Stripe Billing Portal Session for managing subscription."""
-    if not BACKEND_BASE:
-        return None
-    try:
-        resp = requests.post(
-            f"{BACKEND_BASE}/create-portal-session",
-            json={"customer_id": customer_id},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data.get("url")
-    except Exception as e:
-        st.error(f"Billing portal error: {e}")
-        return None
 
 # =========================
 # Page setup
@@ -275,11 +105,49 @@ def auth0_login_url():
         "client_id": AUTH0_CLIENT_ID,
         "redirect_uri": AUTH0_CALLBACK_URL,
         "scope": "openid profile email",
-        # Audience ONLY on /authorize, not on /oauth/token
-        "audience": AUTH0_AUDIENCE,
+        "audience": AUTH0_AUDIENCE,  # 🔑 ask Auth0 for a token for your API
     }
     return f"https://{AUTH0_DOMAIN}/authorize?" + urllib.parse.urlencode(params)
 
+
+BACKEND_BASE_URL = os.getenv(
+    "BACKEND_BASE_URL",
+    "https://catsim-backend.onrender.com"  # your real backend URL
+)
+
+def api_url(path: str) -> str:
+    return f"{BACKEND_BASE_URL.rstrip('/')}{path}"
+
+def get_billing_portal_url(user) -> str | None:
+    """
+    Ask backend for a Stripe Billing Portal URL for this user.
+    """
+    if not user:
+        return None
+
+    payload = {
+        "user_id": user.get("sub"),      # Auth0 subject
+        "email": user.get("email"),      # Auth0 email (helps find Stripe customer)
+    }
+
+    try:
+        resp = requests.post(
+            api_url("/create-portal-session"),
+            json=payload,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("url")
+    except Exception as e:
+        st.sidebar.error("Could not open billing portal. Please contact support if this persists.")
+        if os.getenv("CATSIM_ENV", "dev") == "dev":
+            # Show backend status + body for debugging
+            try:
+                st.sidebar.write("Debug portal:", resp.status_code, resp.text)
+            except Exception:
+                st.sidebar.write("Debug portal exception:", str(e))
+        return None
 
 def auth0_logout_url():
     """Optional: Auth0 logout URL."""
@@ -291,9 +159,13 @@ def auth0_logout_url():
 
 
 def login_button():
-    """Show a clickable link to Auth0."""
-    url = auth0_login_url()
-    st.markdown(f"[Click here to sign in]({url})")
+    auth_url = build_auth0_authorize_url()
+    if st.button("Sign in"):
+        st.markdown(
+            f'<meta http-equiv="refresh" content="0; url={auth_url}">',
+            unsafe_allow_html=True,
+        )
+        st.stop()
 
 
 def _exchange_code_for_tokens(code: str):
@@ -305,13 +177,17 @@ def _exchange_code_for_tokens(code: str):
         "client_secret": AUTH0_CLIENT_SECRET,
         "code": code,
         "redirect_uri": AUTH0_CALLBACK_URL,
-        # NOTE: no 'audience' here
+        "audience": AUTH0_AUDIENCE,  # keep this
     }
 
     resp = requests.post(token_url, data=data)
+
     if resp.status_code != 200:
+        # Show the full error from Auth0 so we can diagnose it
         raise RuntimeError(f"{resp.status_code} {resp.text}")
+
     return resp.json()
+
 
 
 def get_user():
@@ -463,6 +339,63 @@ def get_user():
 
     return None
 
+def start_checkout(tier: str):
+    user = st.session_state.get("user")
+    if not user:
+        st.error("You must be signed in to upgrade.")
+        return
+
+    payload = {
+        "user_id": user.get("sub"),
+        "email": user.get("email"),
+        "name": user.get("name"),
+        "tier": tier,  # "pro" or "standard"
+    }
+
+    try:
+        resp = requests.post(
+            api_url("/create-checkout-session"),
+            json=payload,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        st.write("Redirecting to Stripe Checkout...")
+        st.markdown(
+            f"<meta http-equiv='refresh' content='0; url={data['url']}'>",
+            unsafe_allow_html=True,
+        )
+    except Exception as e:
+        st.error("Checkout error: Could not start Stripe checkout.")
+        if os.getenv("CATSIM_ENV", "dev") == "dev":
+            try:
+                st.write("Debug checkout:", resp.status_code, resp.text)
+            except Exception:
+                st.write("Debug checkout exception:", str(e))
+
+def logout_button():
+    # Auth0 logout URL – kills the Auth0 SSO session
+    logout_url = (
+        f"https://{AUTH0_DOMAIN}/v2/logout?"
+        f"client_id={AUTH0_CLIENT_ID}&"
+        f"returnTo={urllib.parse.quote_plus(APP_BASE_URL)}"
+    )
+
+    if st.sidebar.button("Log out"):  # or wherever your logout button lives
+        # 1) Clear Streamlit session
+        st.session_state.clear()
+
+        # 2) Clear URL query params (old code/state)
+        st.experimental_set_query_params()
+
+        # 3) Redirect the browser to Auth0 logout
+        st.markdown(
+            f"""
+            <meta http-equiv="refresh" content="0; url={logout_url}">
+            """,
+            unsafe_allow_html=True,
+        )
+        st.stop()
 
 def inject_brand_css():
     st.markdown(
@@ -1292,34 +1225,31 @@ with st.sidebar:
     auth_name = (user or {}).get("name", "")
     auth_pic = (user or {}).get("picture")
 
-    # Manage billing portal
-    if user is not None:
+    if auth_pic:
+        st.image(auth_pic, width=64)
+    if auth_name:
+        st.markdown(f"**{auth_name}**")
+    st.caption(auth_email)
+
+    st.header("Plan & Billing")
+    
+    st.markdown("### Account")
+
+    user = st.session_state.get("user")  # however you store Auth0 user
+
+    if user:
         portal_url = get_billing_portal_url(user)
         if portal_url:
-            try:
-                st.link_button(
-                    "Manage billing & invoices",
-                    portal_url,
-                    use_container_width=True,
-                    type="secondary",
-                )
-            except AttributeError:
-                st.markdown(
-                    f"<a href='{portal_url}' target='_blank'>"
-                    "<button style='width:100%; padding:0.5rem 1rem; border-radius:0.5rem;"
-                    "border:1px solid #ccc; background-color:white; cursor:pointer;'>"
-                    "Manage billing & invoices"
-                    "</button></a>",
-                    unsafe_allow_html=True,
-                )
+            st.link_button(
+                "Manage billing & invoices",
+                portal_url,
+                use_container_width=True,
+                type="secondary",
+            )
     else:
         st.caption("Sign in to manage your subscription.")
-
-    # Logout
-    logout_url = auth0_logout_url()
-    if st.button("Log out"):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+    # Dev-only simulated plan controls
+    if CONFIG.get("SHOW_DEV_PLAN_SIM", False):
         st.markdown(
             f"<meta http-equiv='refresh' content='0; url={logout_url}'>",
             unsafe_allow_html=True,
