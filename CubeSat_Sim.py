@@ -36,7 +36,7 @@ ACADEMIC_LINK    = os.getenv("CATSIM_ACAD_LINK", "https://buy.stripe.com/dRm9AT7
 DEPT_LINK        = os.getenv("CATSIM_DEPT_LINK", "https://buy.stripe.com/4gM5kD5Kl9nO7eMaGB1RC05")   # optional
 BACKEND_BASE_URL = os.getenv(
     "BACKEND_BASE_URL",
-    "https://catsim-backend.onrender.com"  # <-- your Render backend URL
+    "https://catsim-backend-prod.onrender.com"  # <-- your Render backend URL
 )
 
 def api_url(path: str) -> str:
