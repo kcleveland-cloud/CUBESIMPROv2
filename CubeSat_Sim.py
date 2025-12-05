@@ -55,27 +55,26 @@ CONFIG = {
         # Dev Auth0 app
         "AUTH0_DOMAIN": "dev-qwn3runpmc616as6.us.auth0.com",
         "AUTH0_CLIENT_ID": "c2tqv60NLCMmiN6fGeIWk5DpYnb4t5Vo",
-        # In practice, put this in an environment variable / Streamlit secret
         "AUTH0_CLIENT_SECRET": os.getenv(
             "AUTH0_CLIENT_SECRET_DEV",
             "E9BAjy7QLsJ0GSAYPMoBvb-vg7lMeLObKBqdsBupoQoVcVUHM75hmXOSDm2jzuw7",
         ),
         "AUTH0_CALLBACK_URL": "https://cubesimprov2-noruuoxdtsrjzdskhuobbr.streamlit.app",
-        # Show dev-only controls like simulated plan selector
         "SHOW_DEV_PLAN_SIM": True,
     },
     "prod": {
-        # TODO: replace these with your production Auth0 app settings
-        "AUTH0_DOMAIN": os.getenv("dev-qwn3runpmc616as6.us.auth0.com"),
-        "AUTH0_CLIENT_ID": os.getenv("XvRZKwcHlcToRYGMMwnZiNjLnNzJmUmU"),
-        "AUTH0_CLIENT_SECRET": os.getenv("AUTH0_CLIENT_SECRET_PROD", "y7Sn91jH3sR1seU5uWPJAM89BSmS-pXfPQPcfDLzt_K3Cu2fk-D0vzYnA2sE2lah"),
-        "AUTH0_CALLBACK_URL": os.getenv(
-            "AUTH0_CALLBACK_URL_PROD",
-            "https://cubesimprov2-lt6hcgkvpdvygnwbktyqdg.streamlit.app",
+        # Prod Auth0 app (values you already have)
+        "AUTH0_DOMAIN": "dev-qwn3runpmc616as6.us.auth0.com",
+        "AUTH0_CLIENT_ID": "XvRZKwcHlcToRYGMMwnZiNjLnNzJmUmU",
+        "AUTH0_CLIENT_SECRET": os.getenv(
+            "AUTH0_CLIENT_SECRET_PROD",
+            "y7Sn91jH3sR1seU5uWPJAM89BSmS-pXfPQPcfDLzt_K3Cu2fk-D0vzYnA2sE2lah",
         ),
+        "AUTH0_CALLBACK_URL": "https://cubesimprov2-lt6hcgkvpdvygnwbktyqdg.streamlit.app",
         "SHOW_DEV_PLAN_SIM": False,
     },
 }[ENV]
+
 
 AUTH0_DOMAIN = CONFIG["AUTH0_DOMAIN"]
 AUTH0_CLIENT_ID = CONFIG["AUTH0_CLIENT_ID"]
