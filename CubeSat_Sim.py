@@ -159,7 +159,7 @@ def auth0_logout_url():
 
 
 def login_button():
-    auth_url = build_auth0_authorize_url()
+    auth_url = auth0_login_url()
     if st.button("Sign in"):
         st.markdown(
             f'<meta http-equiv="refresh" content="0; url={auth_url}">',
