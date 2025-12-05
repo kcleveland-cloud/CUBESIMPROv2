@@ -148,6 +148,37 @@ def get_billing_portal_url(user) -> str | None:
                 st.sidebar.write("Debug portal exception:", str(e))
         return None
 
+def sync_user_with_backend(user):
+    """
+    Best-effort sync of the Auth0 user into the FastAPI backend.
+    Creates/updates a row in the users table and wires up Stripe customer IDs.
+    Never crashes the UI if the backend is down.
+    """
+    if not user:
+        return
+
+    payload = {
+        "user_id": user.get("sub"),
+        "email": user.get("email"),
+        "name": user.get("name"),
+    }
+
+    try:
+        resp = requests.post(
+            api_url("/sync-user"),
+            json=payload,
+            timeout=5,
+        )
+        resp.raise_for_status()
+    except Exception as e:
+        # In production we stay quiet; in dev we surface a warning
+        if os.getenv("CATSIM_ENV", "dev") == "dev":
+            try:
+                st.sidebar.warning(f"User sync failed: {e}")
+            except Exception:
+                pass
+
+
 def auth0_logout_url():
     """Optional: Auth0 logout URL."""
     params = {
