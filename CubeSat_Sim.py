@@ -160,12 +160,10 @@ def auth0_logout_url():
 
 def login_button():
     auth_url = auth0_login_url()
-    if st.button("Sign in"):
-        st.markdown(
-            f'<meta http-equiv="refresh" content="0; url={auth_url}">',
-            unsafe_allow_html=True,
-        )
-        st.stop()
+    # Use Streamlit's built-in link button for reliable redirect
+    st.link_button("Sign in", auth_url)
+    st.stop()
+
 
 def _exchange_code_for_tokens(code: str):
     """Exchange authorization code for tokens via Auth0 /oauth/token."""
