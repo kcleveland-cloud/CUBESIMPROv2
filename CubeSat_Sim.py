@@ -1432,9 +1432,9 @@ with st.sidebar:
                     st.session_state.checkout_url = url
 
         # -------------------------
-        # Education & teams
+        # Education
         # -------------------------
-        st.markdown("**Education & teams:**")
+        st.markdown("**Education:**")
         col_c, col_d = st.columns(2)
 
         # Check if the signed-in user has a .edu email
@@ -1465,16 +1465,7 @@ with st.sidebar:
                     if url:
                         st.session_state.checkout_url = url
 
-        with col_d:
-            if st.button(
-                "Dept License $499/yr",
-                key="dept",
-                help="Department license",
-            ):
-                with st.spinner("Contacting secure Stripe checkout..."):
-                    url = create_checkout_session("dept_yearly", auth_email)
-                if url:
-                    st.session_state.checkout_url = url
+        
     else:
         st.success("✅ You are on the Pro plan.")
 
