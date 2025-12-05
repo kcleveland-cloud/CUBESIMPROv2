@@ -167,7 +167,6 @@ def login_button():
         )
         st.stop()
 
-
 def _exchange_code_for_tokens(code: str):
     """Exchange authorization code for tokens via Auth0 /oauth/token."""
     token_url = f"https://{AUTH0_DOMAIN}/oauth/token"
