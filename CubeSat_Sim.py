@@ -12,6 +12,17 @@ import plotly.graph_objects as go
 import plotly.express as px
 import datetime as dt
 
+# -------------------------
+# Email / plan helpers
+# -------------------------
+def is_edu_email(email: str) -> bool:
+    """Return True if email ends with .edu (case-insensitive)."""
+    if not email:
+        return False
+    return email.strip().lower().endswith(".edu")
+
+
+
 # =========================
 # Stripe Payment Links (Phase 1: simple)
 # =========================
@@ -1420,10 +1431,27 @@ with st.sidebar:
                 if url:
                     st.session_state.checkout_url = url
 
-        st.markdown("**Education & teams:**")
-        col_c, col_d = st.columns(2)
+            st.markdown("**Education & teams:**")
+    col_c, col_d = st.columns(2)
 
-        with col_c:
+    # Check if the signed-in user has a .edu email
+    edu_ok = is_edu_email(auth_email)
+
+    with col_c:
+        if not edu_ok:
+            # Disabled Academic button + explanation
+            st.button(
+                "Academic Pro $99/yr (.edu only)",
+                key="academic_disabled",
+                help="Academic license (requires .edu email)",
+                disabled=True,
+            )
+            st.caption(
+                f"Academic pricing is reserved for users with a valid .edu email address. "
+                f"Current email: `{auth_email}`"
+            )
+        else:
+            # Only .edu users can actually start Academic checkout
             if st.button(
                 "Academic Pro $99/yr",
                 key="academic",
@@ -1434,16 +1462,17 @@ with st.sidebar:
                 if url:
                     st.session_state.checkout_url = url
 
-        with col_d:
-            if st.button(
-                "Dept License $499/yr",
-                key="dept",
-                help="Department license",
-            ):
-                with st.spinner("Contacting secure Stripe checkout..."):
-                    url = create_checkout_session("dept_yearly", auth_email)
-                if url:
-                    st.session_state.checkout_url = url
+    with col_d:
+        if st.button(
+            "Dept License $499/yr",
+            key="dept",
+            help="Department license",
+        ):
+            with st.spinner("Contacting secure Stripe checkout..."):
+                url = create_checkout_session("dept_yearly", auth_email)
+            if url:
+                st.session_state.checkout_url = url
+
     else:
         st.success("✅ You are on the Pro plan.")
 
