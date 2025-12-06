@@ -109,10 +109,7 @@ def auth0_login_url():
     return f"https://{AUTH0_DOMAIN}/authorize?" + urllib.parse.urlencode(params)
 
 
-BACKEND_BASE_URL = os.getenv(
-    "BACKEND_BASE_URL",
-    "https://catsim-backend.onrender.com"  # your real backend URL
-)
+
 
 def api_url(path: str) -> str:
     return f"{BACKEND_BASE_URL.rstrip('/')}{path}"
