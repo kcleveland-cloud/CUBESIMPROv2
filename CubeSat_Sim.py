@@ -308,10 +308,17 @@ def auth0_logout_url():
 
 
 def login_button():
-    auth_url = auth0_login_url()
-    # Use Streamlit's built-in link button for reliable redirect
-    st.link_button("Sign in", auth_url)
-    st.stop()
+    """Show a Sign in button that sends the user to Auth0."""
+    auth_url = auth0_login_url()  # uses the helper defined above
+
+    # Use Streamlit's link_button so the redirect is clean
+    st.link_button(
+        "Sign in",
+        auth_url,
+        type="primary",
+        use_container_width=False,
+    )
+
 
 
 def _exchange_code_for_tokens(code: str):
