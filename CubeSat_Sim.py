@@ -111,8 +111,7 @@ def auth0_login_url():
 
 
 
-def api_url(path: str) -> str:
-    return f"{BACKEND_BASE_URL.rstrip('/')}{path}"
+
 
 def get_billing_portal_url(user) -> str | None:
     """
