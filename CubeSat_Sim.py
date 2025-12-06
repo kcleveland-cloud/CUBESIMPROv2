@@ -1367,42 +1367,11 @@ with st.sidebar:
     # -------------------------
     st.markdown("### Account")
 
+    # Use identity we grabbed earlier
     auth_email = (user or {}).get("email", "unknown")
     auth_name = (user or {}).get("name", "")
     auth_pic = (user or {}).get("picture")
 
-    if auth_pic:
-        st.image(auth_pic, width=64)
-    if auth_name:
-        st.markdown(f"**{auth_name}**")
-    st.caption(auth_email)
-
-    st.header("Plan & Billing")
-    
-    st.markdown("### Account")
-
-    user = st.session_state.get("user")  # however you store Auth0 user
-
-    if user:
-        portal_url = get_billing_portal_url(user)
-        if portal_url:
-            st.link_button(
-                "Manage billing & invoices",
-                portal_url,
-                use_container_width=True,
-                type="secondary",
-            )
-    else:
-        st.caption("Sign in to manage your subscription.")
-    # Dev-only simulated plan controls
-    if CONFIG.get("SHOW_DEV_PLAN_SIM", False):
-        st.markdown(
-            f"<meta http-equiv='refresh' content='0; url={logout_url}'>",
-            unsafe_allow_html=True,
-        )
-        st.stop()
-
-    # Avatar + name
     acct_col1, acct_col2 = st.columns([1, 2])
     with acct_col1:
         if auth_pic:
@@ -1414,12 +1383,29 @@ with st.sidebar:
             st.markdown(f"**{auth_name}**")
         st.caption(auth_email)
 
+    # Auth0 logout
+    logout_button()
+
     st.divider()
 
- # -------------------------
+    # -------------------------
     # Plan & Billing
     # -------------------------
     st.markdown("### Plan & Billing")
+
+    # Stripe billing portal button
+    user_obj = st.session_state.get("user") or user
+    if user_obj:
+        portal_url = get_billing_portal_url(user_obj)
+        if portal_url:
+            st.link_button(
+                "Manage billing & invoices",
+                portal_url,
+                use_container_width=True,
+                type="secondary",
+            )
+    else:
+        st.caption("Sign in to manage your subscription to open the billing portal.")
 
     # Use effective plan + normalized subscription to drive the label
     sub_norm = sub  # already normalized by normalize_subscription_state
@@ -1457,8 +1443,6 @@ with st.sidebar:
         # Local 30-day trial fallback
         end_text = f"Trial ends: {trial_end.isoformat()}"
 
-    
-
     st.markdown(
         f"""
         <div style="padding: 12px; background: #f5f9ff; border: 1px solid #c3d5ff;">
@@ -1469,7 +1453,7 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-       # -------------------------
+    # -------------------------
     # Upgrade buttons
     # -------------------------
     if plan_effective != "pro":
@@ -1540,11 +1524,8 @@ with st.sidebar:
                         url = create_checkout_session("academic_yearly", auth_email)
                     if url:
                         st.session_state.checkout_url = url
-
-        
     else:
         st.success("✅ You are on the Pro plan.")
-
 
     # Checkout link (still in sidebar)
     if st.session_state.get("checkout_url"):
@@ -1629,6 +1610,7 @@ with st.sidebar:
     show_play = st.checkbox("Show Play buttons on plots", True)
     anim_speed = st.slider("Animation speed (Plotly)", 0.1, 5.0, 1.0, 0.1)
     mission_days = st.slider("Mission duration (days)", 1, 365, 60)
+
 
 
 
