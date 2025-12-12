@@ -1293,71 +1293,44 @@ def generate_odar_summary_text(
 # Pricing model & plan state (via backend)
 # =========================
 
-# Attach Auth0 identity early
 auth_email = (user or {}).get("email", "unknown")
 auth_name = (user or {}).get("name", "")
 auth_pic = (user or {}).get("picture")
 auth_sub = (user or {}).get("sub", "")
 
-today = dt.date.today()
-
-# Ensure we have a trial_start baseline for local trial fallback
-if "trial_start" not in st.session_state:
-    st.session_state.trial_start = today.isoformat()
-
 # One-time fetch of raw subscription state from backend, keyed by Auth0 sub
 if "subscription_state" not in st.session_state:
-    st.session_state.subscription_state = fetch_subscription_state(auth_sub)
+    st.session_state.subscription_state = fetch_subscription_state(auth_sub, auth_email)
 
 sub_raw = st.session_state.subscription_state
 sub = normalize_subscription_state(sub_raw)  # <-- unwrap + normalize
 
-trial_start = dt.date.fromisoformat(st.session_state.trial_start)
-trial_end = trial_start + dt.timedelta(days=30)
+plan_key = (sub.get("plan_key") or "").lower()
+status = (sub.get("status") or "").lower()
+in_trial = (status == "trialing")
 
-backend_plan = None
-status = "active"
-customer_id = None
-
-if sub:
-    # Handle either 'plan' or 'plan_key'
-    plan_key = (sub.get("plan_key") or "").lower()
-    plan_field = (sub.get("plan") or "").lower()
-
-    if plan_field in ("standard", "pro"):
-        backend_plan = plan_field
-    elif plan_key.startswith("pro_"):
-        backend_plan = "pro"
-    elif plan_key.startswith("standard_"):
-        backend_plan = "standard"
-    elif plan_key in ("pro", "standard"):
-        backend_plan = plan_key
-
-    status = (sub.get("status") or "active")
-    customer_id = sub.get("customer_id")
-
-# If backend has a real subscription → trust it
-if backend_plan:
-    plan_base = backend_plan          # "standard" or "pro"
-    in_trial = (status.lower() == "trialing")
-    plan_effective = plan_base        # Pro tabs & export check this
+# Back-end now encodes free-trial as plan_key="standard", status="trialing"
+if plan_key.startswith("pro_"):
+    plan_base = "pro"
+elif plan_key.startswith("standard") or plan_key == "standard":
+    plan_base = "standard"
 else:
-    # No Stripe subscription in DB (or backend unreachable) → local 30-day trial
-    if "plan_base" not in st.session_state:
-        st.session_state.plan_base = "trial"
+    plan_base = "free"
 
-    plan_base = st.session_state.plan_base
-    in_trial = (plan_base == "trial") and (today <= trial_end)
-    plan_effective = "standard" if in_trial else plan_base
-    status = "active"
-    customer_id = None
+# Effective plan drives which tabs are unlocked
+if plan_base == "pro":
+    plan_effective = "pro"
+elif plan_base == "standard":
+    plan_effective = "standard"
+else:
+    plan_effective = "free"
+
+customer_id = sub.get("customer_id")
 
 # Persist into session_state for the rest of the app
-st.session_state.plan_base = plan_base
+st.session_state.plan_base = plan_base          # "free" / "standard" / "pro"
 st.session_state.effective_plan = plan_effective
-st.session_state.in_trial = in_trial
-st.session_state.trial_start = trial_start.isoformat()
-st.session_state.trial_end = trial_end.isoformat()
+st.session_state.in_trial = in_trial            # True only when backend says so
 st.session_state.stripe_customer_id = customer_id
 
 
