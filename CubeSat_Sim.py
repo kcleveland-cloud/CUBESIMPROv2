@@ -339,49 +339,7 @@ def _exchange_code_for_tokens(code: str):
 
 
 
-def get_user():
-    """
-    Returns the current user dict, or None.
 
-    1) If user already in session_state -> return it.
-    2) Else, if we have ?code=... in URL -> exchange it, store user, clear params.
-    3) Else return None.
-    """
-    # Already logged in this session
-    if "user" in st.session_state:
-        return st.session_state["user"]
-
-    # Get ?code=... from query params (string in modern Streamlit)
-    params = st.query_params
-    code = params.get("code")
-
-    # st.query_params used to return lists; be robust to both
-    if isinstance(code, list):
-        code = code[0]
-
-    if code:
-        try:
-            tokens = _exchange_code_for_tokens(code)
-            id_token = tokens["id_token"]
-            claims = jwt.get_unverified_claims(id_token)
-
-            user = {
-                "sub": claims.get("sub"),
-                "email": claims.get("email"),
-                "name": claims.get("name"),
-                "picture": claims.get("picture"),
-            }
-            st.session_state["user"] = user
-
-            # Clear query params so the code is not reused on rerun
-            st.query_params.clear()
-
-            return user
-        except Exception as e:
-            st.error(f"Auth error: {e}")
-            return None
-
-    return None
 
 def describe_subscription(sub_state: dict):
     """
@@ -488,39 +446,7 @@ def get_user():
 
     return None
 
-def start_checkout(tier: str):
-    user = st.session_state.get("user")
-    if not user:
-        st.error("You must be signed in to upgrade.")
-        return
 
-    payload = {
-        "user_id": user.get("sub"),
-        "email": user.get("email"),
-        "name": user.get("name"),
-        "tier": tier,  # "pro" or "standard"
-    }
-
-    try:
-        resp = requests.post(
-            api_url("/create-checkout-session"),
-            json=payload,
-            timeout=10,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        st.write("Redirecting to Stripe Checkout...")
-        st.markdown(
-            f"<meta http-equiv='refresh' content='0; url={data['url']}'>",
-            unsafe_allow_html=True,
-        )
-    except Exception as e:
-        st.error("Checkout error: Could not start Stripe checkout.")
-        if os.getenv("CATSIM_ENV", "dev") == "dev":
-            try:
-                st.write("Debug checkout:", resp.status_code, resp.text)
-            except Exception:
-                st.write("Debug checkout exception:", str(e))
 
 def logout_button():
     # Auth0 logout URL – kills the Auth0 SSO session
@@ -1983,14 +1909,18 @@ with tab_power:
         ),
         use_container_width=True,
     )
-st.caption(
-    "💡 Look for: if **daily energy generation < daily load**, end-of-day SoC trends downward over time → adjust load, pointing, β-angle, or panel sizing."
+    st.caption(
+        "💡 Look for: if **daily energy generation < daily load**, end-of-day SoC trends downward over time → "
+        "adjust load, pointing, β-angle, or panel sizing."    
+    )
+
     if len(eod_soc) and eod_soc[-1] < 20.0:
         st.warning(
-            "Projected final SoC < 20% — consider more panel area/efficiency, better pointing, or lower load."
-        )
+            "⚠️ Projected final SoC < 20% — consider more panel area/efficiency, better pointing, or lower load."
+    )
     elif len(eod_soc):
-        st.success("Battery SoC projection looks acceptable.")
+        st.success("✅ Battery SoC projection looks acceptable.")
+
 
 
 # --- TAB 3: THERMAL ---
