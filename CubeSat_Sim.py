@@ -703,6 +703,25 @@ show_header(user)
 # Sync Auth0 identity into backend DB (best-effort; non-fatal if it fails)
 sync_user_with_backend(user)
 
+# =========================
+# First-time user: Start Here (minimal onboarding)
+# =========================
+with st.expander("👋 New to CATSIM? Start Here (5 minutes)", expanded=False):
+    st.markdown(
+        """
+**CATSIM is a CubeSat mission simulator for education and early mission design.**
+
+**Quick start:**
+1. In the left sidebar, click **▶️ Load Example Mission**
+2. Use the tabs: **3D + Ground Track → Power → Thermal**
+3. Change **Altitude** or **Inclination** and re-run by adjusting the sliders
+
+**What to try first:**
+- Increase **Altitude** → watch **period** and **eclipse fraction** change  
+- Change **Inclination** → watch **ground track latitude coverage** change  
+- Change **β-angle** → watch **eclipse fraction** and **power** change
+        """
+    )
 
 
 
@@ -1298,6 +1317,9 @@ auth_name = (user or {}).get("name", "")
 auth_pic = (user or {}).get("picture")
 auth_sub = (user or {}).get("sub", "")
 
+# Local 30-day trial fallback (used only if backend doesn't provide current_period_end)
+trial_end = (dt.datetime.utcnow().date() + dt.timedelta(days=30))
+
 # One-time fetch of raw subscription state from backend, keyed by Auth0 sub
 if "subscription_state" not in st.session_state:
     st.session_state.subscription_state = fetch_subscription_state(auth_sub, auth_email)
@@ -1518,26 +1540,66 @@ with st.sidebar:
     st.divider()
     st.markdown("### Simulation setup")
 
+# -------------------------
+# Quick-start: Example mission loader (minimal onboarding)
+# -------------------------
+EXAMPLE_MISSION_DEFAULTS = {
+    # Put user into generic mode so they can learn the knobs
+    "use_genesat": False,
+    "auto_cal": True,
+
+    # Orbit / bus demo values
+    "altitude_km": 500.0,
+    "incl_deg": 97.6,
+    "mass_kg": 4.0,
+    "Cd": 2.2,
+
+    # Power / thermal demo values
+    "panel_area": 0.05,
+    "panel_eff": 0.28,
+    "absorp": 0.60,
+    "emiss": 0.80,
+
+    # Ops / display
+    "attitude": "body-spin",
+    "elec_derate": 0.70,
+    "beta_deg": 0.0,
+    "show_play": True,
+    "anim_speed": 1.0,
+    "mission_days": 14,
+}
+
+def load_example_mission():
+    for k, v in EXAMPLE_MISSION_DEFAULTS.items():
+        st.session_state[k] = v
+    st.toast("Loaded Example Mission. Now explore tabs (Orbit → Power → Thermal).", icon="✅")
+
+if st.button("▶️ Load Example Mission (500 km • quick demo)", use_container_width=True):
+    load_example_mission()
+
+st.caption("Suggested first run: **Load Example Mission**, then tweak **Altitude** or **Inclination**.")
+
+    
     # Preset & validation
     with st.expander("Preset & validation", expanded=True):
-        use_genesat = st.checkbox("Load GeneSat-1 defaults", True)
-        auto_cal = st.checkbox("Calibrate avg power to GeneSat target (~4.5 W)", True)
+        use_genesat = st.checkbox("Load GeneSat-1 defaults", True, key="use_genesat")
+        auto_cal = st.checkbox("Calibrate avg power to GeneSat target (~4.5 W)", True, key="auto_cal")
 
     # Mission parameters
     st.markdown("#### Mission parameters")
 
     if use_genesat:
         altitude_km = st.slider(
-            "Altitude (km)", 200.0, 700.0, GENESAT_DEFAULTS["altitude_km"]
+            "Altitude (km)", 200.0, 700.0, GENESAT_DEFAULTS["altitude_km"], key="altitude_km"
         )
         incl_deg = st.slider(
-            "Inclination (deg)", 0.0, 98.0, GENESAT_DEFAULTS["incl_deg"]
+            "Inclination (deg)", 0.0, 98.0, GENESAT_DEFAULTS["incl_deg"], key="incl_deg"
         )
         mass_kg = st.number_input(
-            "Mass (kg)", 0.1, 50.0, GENESAT_DEFAULTS["mass_kg"], 0.1
+            "Mass (kg)", 0.1, 50.0, GENESAT_DEFAULTS["mass_kg"], 0.1, key="mass_kg"
         )
         Cd = st.slider(
-            "Drag coefficient Cd", 1.5, 3.0, GENESAT_DEFAULTS["Cd"], 0.1
+            "Drag coefficient Cd", 1.5, 3.0, GENESAT_DEFAULTS["Cd"], 0.1, key="Cd"
         )
         panel_area = st.number_input(
             "Panel area / face (m²)",
@@ -1545,28 +1607,29 @@ with st.sidebar:
             0.5,
             GENESAT_DEFAULTS["panel_area_m2"],
             0.001,
+            key="panel_area",
         )
         panel_eff = st.slider(
-            "Panel efficiency η", 0.05, 0.38, GENESAT_DEFAULTS["panel_eff"], 0.01
+            "Panel efficiency η", 0.05, 0.38, GENESAT_DEFAULTS["panel_eff"], 0.01, key="panel_eff"
         )
         absorp = st.slider(
-            "Absorptivity α", 0.1, 1.0, GENESAT_DEFAULTS["absorptivity"], 0.01
+            "Absorptivity α", 0.1, 1.0, GENESAT_DEFAULTS["absorptivity"], 0.01, key="absorp"
         )
         emiss = st.slider(
-            "Emissivity ε", 0.1, 1.0, GENESAT_DEFAULTS["emissivity"], 0.01
+            "Emissivity ε", 0.1, 1.0, GENESAT_DEFAULTS["emissivity"], 0.01, key="emiss"
         )
         target_avgW = GENESAT_DEFAULTS["target_avg_power_W"]
     else:
-        altitude_km = st.slider("Altitude (km)", 200.0, 2000.0, 500.0)
-        incl_deg = st.slider("Inclination (deg)", 0.0, 98.0, 51.6)
-        mass_kg = st.number_input("Mass (kg)", 0.1, 200.0, 4.0, 0.1)
-        Cd = st.slider("Drag coefficient Cd", 1.0, 3.5, 2.2, 0.1)
+        altitude_km = st.slider("Altitude (km)", 200.0, 2000.0, 500.0, key="altitude_km")
+        incl_deg = st.slider("Inclination (deg)", 0.0, 98.0, 51.6, key="incl_deg")
+        mass_kg = st.number_input("Mass (kg)", 0.1, 200.0, 4.0, 0.1, key="mass_kg")
+        Cd = st.slider("Drag coefficient Cd", 1.0, 3.5, 2.2, 0.1, key="Cd")
         panel_area = st.number_input(
-            "Panel area / face (m²)", 0.001, 2.0, 0.05, 0.001
+            "Panel area / face (m²)", 0.001, 2.0, 0.05, 0.001, key="panel_area"
         )
-        panel_eff = st.slider("Panel efficiency η", 0.05, 0.38, 0.28, 0.01)
-        absorp = st.slider("Absorptivity α", 0.1, 1.0, 0.6, 0.01)
-        emiss = st.slider("Emissivity ε", 0.1, 1.0, 0.8, 0.01)
+        panel_eff = st.slider("Panel efficiency η", 0.05, 0.38, 0.28, 0.01, key="panel_eff")
+        absorp = st.slider("Absorptivity α", 0.1, 1.0, 0.6, 0.01, key="absorp")
+        emiss = st.slider("Emissivity ε", 0.1, 1.0, 0.8, 0.01, key="emiss")
         target_avgW = st.number_input(
             "Target avg power (W) for calibration", 0.1, 50.0, 4.5, 0.1
         )
@@ -1575,17 +1638,17 @@ with st.sidebar:
     st.markdown("#### Attitude & ops")
 
     attitude = st.radio(
-        "Attitude", ["body-spin", "sun-tracking", "nadir-pointing"], horizontal=False
+        "Attitude", ["body-spin", "sun-tracking", "nadir-pointing"], horizontal=False, key="attitude"
     )
     elec_derate = st.slider(
-        "Electrical derate (BOL→EOL, MPPT, wiring)", 0.40, 1.00, 0.70, 0.01
+        "Electrical derate (BOL→EOL, MPPT, wiring)", 0.40, 1.00, 0.70, 0.01, key="elec_derate"
     )
     beta_deg = st.slider(
-        "β-angle (deg) — Sun vs. orbital plane", -80.0, 80.0, 0.0, 0.5
+        "β-angle (deg) — Sun vs. orbital plane", -80.0, 80.0, 0.0, 0.5, key="beta_deg"
     )
-    show_play = st.checkbox("Show Play buttons on plots", True)
-    anim_speed = st.slider("Animation speed (Plotly)", 0.1, 5.0, 1.0, 0.1)
-    mission_days = st.slider("Mission duration (days)", 1, 365, 60)
+    show_play = show_play = st.checkbox("Show Play buttons on plots", True, key="show_play")
+    anim_speed = st.slider("Animation speed (Plotly)", 0.1, 5.0, 1.0, 0.1, key="anim_speed")
+    mission_days = st.slider("Mission duration (days)", 1, 365, 60, key="mission_days")
 
 
 
@@ -1757,7 +1820,7 @@ with tab_orbit:
             ]
         )
     st.plotly_chart(fig3d, use_container_width=True)
-
+    st.caption("💡 Look for: higher **Altitude** changes orbital period; **β-angle** changes eclipse time (sunlit vs eclipse arcs).")
     fig_gt = go.Figure()
     fig_gt.add_trace(
         go.Scattergeo(
@@ -1832,7 +1895,7 @@ with tab_orbit:
             ]
         )
     st.plotly_chart(fig_gt, use_container_width=True)
-
+    st.caption("💡 Look for: **Inclination** drives latitude coverage; near-polar inclinations increase high-latitude access.")
     c1, c2, c3 = st.columns(3)
     c1.metric("Orbital period (min)", f"{sim.T_orbit / 60.0:.2f}")
     c2.metric("Eclipse fraction", f"{sim.eclipse_fraction():.3f}")
@@ -1867,7 +1930,7 @@ with tab_power:
         ),
         use_container_width=True,
     )
-
+    st.caption("💡 Look for: power drops during **eclipse**; switching to **sun-tracking** usually increases orbit-average power.")
     st.markdown("### β-angle sweep (current attitude)")
     betas = np.linspace(-80, 80, 161)
     oap = np.array([sim.avg_power_at_beta(attitude, b, sim.A_panel, sim.eta) for b in betas])
@@ -1883,7 +1946,7 @@ with tab_power:
         ),
         use_container_width=True,
     )
-
+    st.caption("💡 Look for: larger |β| reduces eclipse; beyond a critical β there may be **no eclipse** (higher average power).")
     st.markdown("### Battery & Load (baseline SoC)")
     cons_W = st.slider("Average consumption (W)", 0.1, 50.0, 3.0, 0.1)
     batt_Wh = st.slider("Battery capacity (Wh)", 5.0, 1000.0, 30.0, 1.0)
@@ -2006,7 +2069,7 @@ with tab_thermal:
 
     # Shell temp only in this tab (no interior in 1-node model)
     st.metric("Shell equilibrium temp (°C)", f"{T_c:.2f}")
-
+    st.caption("💡 Look for: increasing **α** raises absorbed heat; increasing **ε** or radiating area improves cooling.")
     dfQ = pd.DataFrame(
         [
             {
