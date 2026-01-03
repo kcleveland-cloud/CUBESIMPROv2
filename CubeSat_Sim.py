@@ -24,7 +24,7 @@ def is_edu_email(email: str) -> bool:
 
 
 # =========================
-# Stripe Payment Links (Phase 1: simple)
+# Stripe Checkout Sessions (via backend)
 # =========================
 # TODO: Paste in your real Stripe payment link URLs from the dashboard.
 
@@ -536,44 +536,6 @@ def inject_brand_css():
         """,
         unsafe_allow_html=True,
     )
-
-
-def start_checkout(tier: str):
-    user = st.session_state.get("user")
-    if not user:
-        st.error("You must be signed in to upgrade.")
-        return
-
-    payload = {
-        "user_id": user.get("sub"),
-        "email": user.get("email"),
-        "name": user.get("name"),
-        "tier": tier,  # "pro" or "standard"
-    }
-
-    try:
-        resp = requests.post(
-            api_url("/create-checkout-session"),
-            json=payload,
-            timeout=10,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        st.write("Redirecting to Stripe Checkout...")
-        st.markdown(
-            f"<meta http-equiv='refresh' content='0; url={data['url']}'>",
-            unsafe_allow_html=True,
-        )
-    except Exception as e:
-        st.error("Checkout error: Could not start Stripe checkout.")
-        if os.getenv("CATSIM_ENV", "dev") == "dev":
-            try:
-                st.write("Debug checkout:", resp.status_code, resp.text)
-            except Exception:
-                st.write("Debug checkout exception:", str(e))
-
-
-
 
 def show_header(user):
     col1, col2 = st.columns([1, 3])
@@ -1496,7 +1458,7 @@ with st.sidebar:
     if st.button("▶️ Load Example Mission (500 km • quick demo)", use_container_width=True):
         load_example_mission()
 
-    st.caption("Suggested first run: **Load Example Mission**, then tweak **Altitude** or **Inclination**.")
+    st.caption("Suggested first run: **Load Example Mission → open Power tab → tweak Altitude or β-angle**.")
 
     # Preset & validation
     with st.expander("Preset & validation", expanded=True):
