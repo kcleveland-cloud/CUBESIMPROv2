@@ -1540,46 +1540,38 @@ with st.sidebar:
     st.divider()
     st.markdown("### Simulation setup")
 
-# -------------------------
-# Quick-start: Example mission loader (minimal onboarding)
-# -------------------------
-EXAMPLE_MISSION_DEFAULTS = {
-    # Put user into generic mode so they can learn the knobs
-    "use_genesat": False,
-    "auto_cal": True,
+    # -------------------------
+    # Quick-start: Example mission loader (minimal onboarding)
+    # -------------------------
+    EXAMPLE_MISSION_DEFAULTS = {
+        "use_genesat": False,
+        "auto_cal": True,
+        "altitude_km": 500.0,
+        "incl_deg": 97.6,
+        "mass_kg": 4.0,
+        "Cd": 2.2,
+        "panel_area": 0.05,
+        "panel_eff": 0.28,
+        "absorp": 0.60,
+        "emiss": 0.80,
+        "attitude": "body-spin",
+        "elec_derate": 0.70,
+        "beta_deg": 0.0,
+        "show_play": True,
+        "anim_speed": 1.0,
+        "mission_days": 14,
+    }
 
-    # Orbit / bus demo values
-    "altitude_km": 500.0,
-    "incl_deg": 97.6,
-    "mass_kg": 4.0,
-    "Cd": 2.2,
+    def load_example_mission():
+        for k, v in EXAMPLE_MISSION_DEFAULTS.items():
+            st.session_state[k] = v
+        st.toast("Loaded Example Mission. Now explore tabs (Orbit → Power → Thermal).", icon="✅")
 
-    # Power / thermal demo values
-    "panel_area": 0.05,
-    "panel_eff": 0.28,
-    "absorp": 0.60,
-    "emiss": 0.80,
+    if st.button("▶️ Load Example Mission (500 km • quick demo)", use_container_width=True):
+        load_example_mission()
 
-    # Ops / display
-    "attitude": "body-spin",
-    "elec_derate": 0.70,
-    "beta_deg": 0.0,
-    "show_play": True,
-    "anim_speed": 1.0,
-    "mission_days": 14,
-}
+    st.caption("Suggested first run: **Load Example Mission**, then tweak **Altitude** or **Inclination**.")
 
-def load_example_mission():
-    for k, v in EXAMPLE_MISSION_DEFAULTS.items():
-        st.session_state[k] = v
-    st.toast("Loaded Example Mission. Now explore tabs (Orbit → Power → Thermal).", icon="✅")
-
-if st.button("▶️ Load Example Mission (500 km • quick demo)", use_container_width=True):
-    load_example_mission()
-
-st.caption("Suggested first run: **Load Example Mission**, then tweak **Altitude** or **Inclination**.")
-
-    
     # Preset & validation
     with st.expander("Preset & validation", expanded=True):
         use_genesat = st.checkbox("Load GeneSat-1 defaults", True, key="use_genesat")
@@ -1589,66 +1581,35 @@ st.caption("Suggested first run: **Load Example Mission**, then tweak **Altitude
     st.markdown("#### Mission parameters")
 
     if use_genesat:
-        altitude_km = st.slider(
-            "Altitude (km)", 200.0, 700.0, GENESAT_DEFAULTS["altitude_km"], key="altitude_km"
-        )
-        incl_deg = st.slider(
-            "Inclination (deg)", 0.0, 98.0, GENESAT_DEFAULTS["incl_deg"], key="incl_deg"
-        )
-        mass_kg = st.number_input(
-            "Mass (kg)", 0.1, 50.0, GENESAT_DEFAULTS["mass_kg"], 0.1, key="mass_kg"
-        )
-        Cd = st.slider(
-            "Drag coefficient Cd", 1.5, 3.0, GENESAT_DEFAULTS["Cd"], 0.1, key="Cd"
-        )
-        panel_area = st.number_input(
-            "Panel area / face (m²)",
-            0.001,
-            0.5,
-            GENESAT_DEFAULTS["panel_area_m2"],
-            0.001,
-            key="panel_area",
-        )
-        panel_eff = st.slider(
-            "Panel efficiency η", 0.05, 0.38, GENESAT_DEFAULTS["panel_eff"], 0.01, key="panel_eff"
-        )
-        absorp = st.slider(
-            "Absorptivity α", 0.1, 1.0, GENESAT_DEFAULTS["absorptivity"], 0.01, key="absorp"
-        )
-        emiss = st.slider(
-            "Emissivity ε", 0.1, 1.0, GENESAT_DEFAULTS["emissivity"], 0.01, key="emiss"
-        )
+        altitude_km = st.slider("Altitude (km)", 200.0, 700.0, GENESAT_DEFAULTS["altitude_km"], key="altitude_km")
+        incl_deg = st.slider("Inclination (deg)", 0.0, 98.0, GENESAT_DEFAULTS["incl_deg"], key="incl_deg")
+        mass_kg = st.number_input("Mass (kg)", 0.1, 50.0, GENESAT_DEFAULTS["mass_kg"], 0.1, key="mass_kg")
+        Cd = st.slider("Drag coefficient Cd", 1.5, 3.0, GENESAT_DEFAULTS["Cd"], 0.1, key="Cd")
+        panel_area = st.number_input("Panel area / face (m²)", 0.001, 0.5, GENESAT_DEFAULTS["panel_area_m2"], 0.001, key="panel_area")
+        panel_eff = st.slider("Panel efficiency η", 0.05, 0.38, GENESAT_DEFAULTS["panel_eff"], 0.01, key="panel_eff")
+        absorp = st.slider("Absorptivity α", 0.1, 1.0, GENESAT_DEFAULTS["absorptivity"], 0.01, key="absorp")
+        emiss = st.slider("Emissivity ε", 0.1, 1.0, GENESAT_DEFAULTS["emissivity"], 0.01, key="emiss")
         target_avgW = GENESAT_DEFAULTS["target_avg_power_W"]
     else:
         altitude_km = st.slider("Altitude (km)", 200.0, 2000.0, 500.0, key="altitude_km")
         incl_deg = st.slider("Inclination (deg)", 0.0, 98.0, 51.6, key="incl_deg")
         mass_kg = st.number_input("Mass (kg)", 0.1, 200.0, 4.0, 0.1, key="mass_kg")
         Cd = st.slider("Drag coefficient Cd", 1.0, 3.5, 2.2, 0.1, key="Cd")
-        panel_area = st.number_input(
-            "Panel area / face (m²)", 0.001, 2.0, 0.05, 0.001, key="panel_area"
-        )
+        panel_area = st.number_input("Panel area / face (m²)", 0.001, 2.0, 0.05, 0.001, key="panel_area")
         panel_eff = st.slider("Panel efficiency η", 0.05, 0.38, 0.28, 0.01, key="panel_eff")
         absorp = st.slider("Absorptivity α", 0.1, 1.0, 0.6, 0.01, key="absorp")
         emiss = st.slider("Emissivity ε", 0.1, 1.0, 0.8, 0.01, key="emiss")
-        target_avgW = st.number_input(
-            "Target avg power (W) for calibration", 0.1, 50.0, 4.5, 0.1
-        )
+        target_avgW = st.number_input("Target avg power (W) for calibration", 0.1, 50.0, 4.5, 0.1)
 
     # Attitude & ops
     st.markdown("#### Attitude & ops")
-
-    attitude = st.radio(
-        "Attitude", ["body-spin", "sun-tracking", "nadir-pointing"], horizontal=False, key="attitude"
-    )
-    elec_derate = st.slider(
-        "Electrical derate (BOL→EOL, MPPT, wiring)", 0.40, 1.00, 0.70, 0.01, key="elec_derate"
-    )
-    beta_deg = st.slider(
-        "β-angle (deg) — Sun vs. orbital plane", -80.0, 80.0, 0.0, 0.5, key="beta_deg"
-    )
-    show_play = show_play = st.checkbox("Show Play buttons on plots", True, key="show_play")
+    attitude = st.radio("Attitude", ["body-spin", "sun-tracking", "nadir-pointing"], horizontal=False, key="attitude")
+    elec_derate = st.slider("Electrical derate (BOL→EOL, MPPT, wiring)", 0.40, 1.00, 0.70, 0.01, key="elec_derate")
+    beta_deg = st.slider("β-angle (deg) — Sun vs. orbital plane", -80.0, 80.0, 0.0, 0.5, key="beta_deg")
+    show_play = st.checkbox("Show Play buttons on plots", True, key="show_play")
     anim_speed = st.slider("Animation speed (Plotly)", 0.1, 5.0, 1.0, 0.1, key="anim_speed")
     mission_days = st.slider("Mission duration (days)", 1, 365, 60, key="mission_days")
+
 
 
 
