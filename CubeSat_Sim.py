@@ -1983,7 +1983,8 @@ with tab_power:
         ),
         use_container_width=True,
     )
-
+st.caption(
+    "💡 Look for: if **daily energy generation < daily load**, end-of-day SoC trends downward over time → adjust load, pointing, β-angle, or panel sizing."
     if len(eod_soc) and eod_soc[-1] < 20.0:
         st.warning(
             "Projected final SoC < 20% — consider more panel area/efficiency, better pointing, or lower load."
